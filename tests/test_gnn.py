@@ -4,6 +4,13 @@ import pytest
 import torch
 
 from src.gnn import GraphSAGENet, compute_normalized_adjacency, train_graphsage
+from src.gt_ssl_extractor import (
+    GTSSLConfig,
+    GTSSLPretrainer,
+    _bootstrap_auc_delta,
+    _contrastive_loss,
+    build_walk_sequences,
+)
 from src.graph import build_union_graph_data
 
 
@@ -86,3 +93,57 @@ def test_train_graphsage_pipeline(sample_graph_for_gnn):
     assert eval_metrics["train_rows"] == 3  # t1, t2, t3
     assert eval_metrics["valid_rows"] == 3  # t4, t5, t6
     assert 0.0 <= eval_metrics["roc_auc"] <= 1.0
+
+
+def test_gt_ssl_walks_are_fixed_length_and_seeded():
+    config = GTSSLConfig(hidden_dim=16, attention_heads=4, encoder_layers=1)
+    edge_index = np.array([[0, 1, 1, 2], [1, 2, 3, 3]], dtype=np.int32)
+    features = np.array(
+        [[1.0, 0.0, 0.0], [0.9, 0.1, 0.0], [0.0, 1.0, 0.0], [0, 0, 1]],
+        dtype=np.float32,
+    )
+
+    sequences_a, edges_a = build_walk_sequences(
+        edge_index, features, np.arange(4, dtype=np.int32), 4, config
+    )
+    sequences_b, edges_b = build_walk_sequences(
+        edge_index, features, np.arange(4, dtype=np.int32), 4, config
+    )
+
+    assert sequences_a.shape == (4, 8)
+    assert edges_a.shape == (4, 7)
+    assert np.array_equal(sequences_a[:, 0], np.arange(4))
+    assert np.array_equal(sequences_a, sequences_b)
+    assert np.array_equal(edges_a, edges_b)
+
+
+def test_gt_ssl_encoder_and_contrastive_loss_backpropagate():
+    config = GTSSLConfig(hidden_dim=16, attention_heads=4, encoder_layers=1)
+    model = GTSSLPretrainer(input_dim=4, reconstruction_dim=3, config=config)
+    features = torch.randn(4, 8, 4)
+    features[..., -1] = 0.0
+    edge_keep = torch.ones(4, 7, dtype=torch.bool)
+
+    reconstructed, first_view, hidden = model(features, edge_keep)
+    second_view = model(features + 0.01, edge_keep)[1]
+    loss = reconstructed.square().mean() + _contrastive_loss(
+        first_view, second_view, config.contrastive_temperature
+    )
+    loss.backward()
+
+    assert reconstructed.shape == (4, 8, 3)
+    assert hidden.shape == (4, 8, config.hidden_dim)
+    assert torch.isfinite(loss)
+    assert model.input_projection.weight.grad is not None
+
+
+def test_gt_ssl_auc_delta_bootstrap_is_zero_for_identical_predictions():
+    labels = np.array([0, 0, 1, 1, 0, 1], dtype=np.int8)
+    probabilities = np.array([0.1, 0.2, 0.8, 0.9, 0.3, 0.7])
+
+    low, high = _bootstrap_auc_delta(
+        labels, probabilities, probabilities, random_state=7, iterations=20
+    )
+
+    assert low == 0.0
+    assert high == 0.0

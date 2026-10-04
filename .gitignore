@@ -6,7 +6,9 @@ data/*.csv
 data/*.ipynb
 artifacts/*.csv
 artifacts/*.json
+artifacts/*.npz
 models/*.joblib
+models/*.pt
 submissions/*.csv
 !artifacts/.gitkeep
 !models/.gitkeep
@@ -16,3 +18,9 @@ submissions/*.csv
 !artifacts/adversarial_validation.csv
 !artifacts/adversarial_feature_importance.csv
 !artifacts/permutation_feature_importance.csv
+!artifacts/gt_ssl_pilot_holdout_causal_seed42.csv
+!artifacts/gt_ssl_pilot_holdout_causal_seed7.csv
+!artifacts/gt_ssl_pilot_holdout_full_transductive_seed42.csv
+!artifacts/gt_ssl_pilot_pretraining_causal_seed42.csv
+!artifacts/gt_ssl_pilot_pretraining_causal_seed7.csv
+!artifacts/gt_ssl_pilot_pretraining_full_transductive_seed42.csv

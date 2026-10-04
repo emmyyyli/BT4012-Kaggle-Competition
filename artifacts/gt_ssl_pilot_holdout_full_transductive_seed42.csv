@@ -1,0 +1,7 @@
+model,pretraining_scope,pretrain_cutoff,validation_window,embedding_dim,roc_auc,pr_auc,train_rows,valid_rows,auc_delta_vs_baseline,auc_delta_ci_2_5,auc_delta_ci_97_5
+supplied_features,full_transductive,all,22-35,0,0.8837428978418163,0.8041519070530316,19530,11705,,,
+supplied_features,full_transductive,all,22-28,0,0.9416869652095577,0.875827188697186,19530,5677,,,
+supplied_features,full_transductive,all,29-35,0,0.8287185739138893,0.7573819579100632,19530,6028,,,
+supplied_plus_gt_ssl,full_transductive,all,22-35,64,0.8617687698799668,0.795718103120115,19530,11705,-0.0219741279618495,-0.02495828177779913,-0.019006991246715187
+supplied_plus_gt_ssl,full_transductive,all,22-28,64,0.9390341128648603,0.8718511288881905,19530,5677,-0.002652852344697476,,
+supplied_plus_gt_ssl,full_transductive,all,29-35,64,0.7873867172446215,0.7452602929028344,19530,6028,-0.04133185666926775,,
