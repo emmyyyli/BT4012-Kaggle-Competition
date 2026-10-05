@@ -24,3 +24,5 @@ submissions/*.csv
 !artifacts/gt_ssl_pilot_pretraining_causal_seed42.csv
 !artifacts/gt_ssl_pilot_pretraining_causal_seed7.csv
 !artifacts/gt_ssl_pilot_pretraining_full_transductive_seed42.csv
+!artifacts/lgbm_robustness_results.csv
+!artifacts/lgbm_robustness_summary.csv

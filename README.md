@@ -79,3 +79,19 @@ The script reports matched baseline and augmented LightGBM ROC-AUC/PR-AUC for th
 The supplied-feature LightGBM baseline scored **0.88374 ROC-AUC** on steps 22–35. Concatenating 64-dimensional embeddings decreased the score on both causal pretraining seeds: **0.84116** (seed 42) and **0.84306** (seed 7). Full transductive pretraining scored **0.86177** (seed 42), also below baseline. The paired row-bootstrap 95% interval for the ROC-AUC difference was [-0.04762, -0.03726] for causal seed 42, [-0.04524, -0.03626] for causal seed 7, and [-0.02496, -0.01901] for full transductive seed 42. These intervals condition on the fitted models and validation rows; they do not capture variation across model fits.
 
 The augmented model was worse on both subwindows, with the largest deficit on steps 29–35. These pilot settings therefore do not justify adding GT-SSL embeddings to the LightGBM submission. The outcome does not rule out the paper's full method: this pilot omits amount and temporal walk weights, pseudo-labeling, Louvain consensus, and uses a smaller encoder than the paper. The issue is that the proposed self-supervised-only extractor, as tested with available inputs and leakage-conscious validation, did not improve the metric.
+
+## LightGBM resilience experiments
+
+Run matched temporal experiments for sample recency weighting and removing the distribution-shift-heavy features `feat_101` and `feat_103`:
+
+```bash
+python -m src.run_lgbm_robustness_experiments
+```
+
+The runner compares the unweighted baseline, exponential recency half-lives of 3, 7, and 14 time steps, dropping either feature individually, and dropping both. Sample weights are normalized to mean one within each training split and are passed to LightGBM alongside the existing class weighting. Every variant uses the same model settings and time-forward folds, including the steps 1–21 → 22–35 holdout; two seeds are run by default. Fold-level metrics, summaries, and validation predictions are saved under `artifacts/`. These remain experiments and do not alter the production submission pipeline.
+
+### Initial results (seeds 7 and 42)
+
+No candidate has yet shown a consistent improvement across seeds. On the long holdout, mean ROC-AUC across the two seeds was **0.86986** for baseline, **0.87478** for a 14-step recency half-life, **0.87499** after dropping `feat_103`, and **0.87367** after dropping `feat_101`. However, each of those three candidates improved one seed and reduced the other; paired AUC deltas ranged from -0.0080 to +0.0178 for half-life 14 and from -0.0074 to +0.0177 for dropping `feat_103`. Dropping both features was worse on average (0.86529). A 3-step half-life was clearly harmful on the long holdout (0.84298 mean AUC).
+
+On the latest expanding fold (train through step 28, validate 29–35), all variants were close in ROC-AUC. Three-step weighting improved the mean by about 0.00075 across seeds, but that small gain did not transfer to the longer 1–21 → 22–35 holdout. These results are exploratory: the two seeds are too few to select a replacement model, and the historical/test gap remains unobserved in labels. Keep the unweighted 165-feature baseline until further chronological repeats support a stable gain.
