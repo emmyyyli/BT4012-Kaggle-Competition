@@ -1,0 +1,33 @@
+  t14_v15-35 shallow_all
+  t14_v15-35 tuned_lgbm_all
+  t14_v15-35 tuned_lgbm_all_no_feat2
+  t14_v15-35 tuned_lgbm_all_no_test_drift5
+  t21_v22-35 shallow_all
+  t21_v22-35 tuned_lgbm_all
+  t21_v22-35 tuned_lgbm_all_no_feat2
+  t21_v22-35 tuned_lgbm_all_no_test_drift5
+  t21_v22-28 shallow_all
+  t21_v22-28 tuned_lgbm_all
+  t21_v22-28 tuned_lgbm_all_no_feat2
+  t21_v22-28 tuned_lgbm_all_no_test_drift5
+  t25_v26-35 shallow_all
+  t25_v26-35 tuned_lgbm_all
+  t25_v26-35 tuned_lgbm_all_no_feat2
+  t25_v26-35 tuned_lgbm_all_no_test_drift5
+  t28_v29-35 shallow_all
+  t28_v29-35 tuned_lgbm_all
+  t28_v29-35 tuned_lgbm_all_no_feat2
+  t28_v29-35 tuned_lgbm_all_no_test_drift5
+High-illicit training steps withheld: [9, 13, 20, 28, 29, 32]
+                                clean  drift_0.5  drift_1.0  noise_aggregated  noise_local  rare_positives  rare_positives_p5  withhold_high_illicit  worst_scenario_auc worst_scenario  worst_window_any_scenario
+candidate                                                                                                                                                                                                         
+shallow_all                    0.9480     0.9349     0.9364            0.9396       0.8741          0.9483             0.9371                 0.9379              0.8741    noise_local                     0.8259
+tuned_lgbm_all_no_test_drift5  0.9542     0.9463     0.9455            0.9391       0.8713          0.9538             0.9421                 0.9491              0.8713    noise_local                     0.8241
+tuned_lgbm_all_no_feat2        0.9559     0.9495     0.9489            0.9430       0.8652          0.9562             0.9458                 0.9533              0.8652    noise_local                     0.8338
+tuned_lgbm_all                 0.9523     0.9423     0.9421            0.9412       0.8644          0.9523             0.9415                 0.9432              0.8644    noise_local                     0.8250
+Fitting tuned_lgbm_all on 31,235 labeled rows x 10 seeds
+Fitting tuned_lgbm_all_no_feat2 on 31,235 labeled rows x 10 seeds
+Fitting tuned_lgbm_all_no_test_drift5 on 31,235 labeled rows x 10 seeds
+Wrote submissions/submission_tuned_lgbm_all.csv
+Wrote submissions/submission_tuned_lgbm_all_no_test_drift5.csv
+Wrote submissions/submission_tuned_lgbm_all_no_feat2.csv

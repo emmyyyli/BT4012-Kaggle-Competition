@@ -26,3 +26,6 @@ submissions/*.csv
 !artifacts/gt_ssl_pilot_pretraining_full_transductive_seed42.csv
 !artifacts/lgbm_robustness_results.csv
 !artifacts/lgbm_robustness_summary.csv
+# Large per-row prediction dumps from the experiment runners (summaries stay tracked)
+artifacts/**/*.csv.gz
+artifacts/stress/stress_predictions.csv

@@ -1,0 +1,49 @@
+
+===== gnn =====
+  t14_v15-35 sage_masked
+  t14_v15-35 sage_old_regime
+  t21_v22-35 sage_masked
+  t21_v22-35 sage_old_regime
+  t21_v22-28 sage_masked
+  t21_v22-28 sage_old_regime
+  t25_v26-35 sage_masked
+  t25_v26-35 sage_old_regime
+  t28_v29-35 sage_masked
+  t28_v29-35 sage_old_regime
+window                     t14_v15-35  t21_v22-28  t21_v22-35  t25_v26-35  t28_v29-35    mean
+candidate                                                                                    
+shallow_all                    0.8884      0.9557      0.9048      0.9948      0.9961  0.9480
+blend_sage_old_regime_0.2      0.8898      0.9522      0.8985      0.9966      0.9979  0.9470
+blend_sage_old_regime_0.3      0.8892      0.9492      0.8933      0.9963      0.9979  0.9452
+blend_sage_masked_0.2          0.8859      0.9497      0.8946      0.9962      0.9978  0.9449
+blend_sage_masked_0.3          0.8826      0.9458      0.8873      0.9958      0.9978  0.9418
+sage_old_regime                0.8508      0.9147      0.8440      0.9638      0.9725  0.9091
+sage_masked                    0.8236      0.9028      0.8226      0.9741      0.9823  0.9011
+                candidate  mean_roc_auc  worst_roc_auc  mean_delta_vs_baseline  min_window_delta  windows_improved  windows  mean_seed_auc_std  adopt
+              shallow_all        0.9480         0.8884                  0.0000            0.0000                 0        5             0.0019  False
+blend_sage_old_regime_0.2        0.9470         0.8898                 -0.0010           -0.0063                 3        5             0.0028  False
+blend_sage_old_regime_0.3        0.9452         0.8892                 -0.0028           -0.0115                 3        5             0.0038  False
+    blend_sage_masked_0.2        0.9449         0.8859                 -0.0031           -0.0102                 2        5             0.0017  False
+    blend_sage_masked_0.3        0.9418         0.8826                 -0.0061           -0.0175                 2        5             0.0022  False
+          sage_old_regime        0.9091         0.8440                 -0.0388           -0.0608                 0        5             0.0146  False
+              sage_masked        0.9011         0.8226                 -0.0469           -0.0822                 0        5             0.0127  False
+
+===== pseudo =====
+  t14_v15-35
+  t21_v22-35
+  t21_v22-28
+  t25_v26-35
+  t28_v29-35
+               pseudo_pos  pseudo_neg     pool
+variant                                       
+pseudo_loose       4380.0     56400.0  76804.0
+pseudo_strict      1941.0     40722.0  76804.0
+window         t14_v15-35  t21_v22-28  t21_v22-35  t25_v26-35  t28_v29-35    mean
+candidate                                                                        
+shallow_all        0.8884      0.9557      0.9048      0.9948      0.9961  0.9480
+pseudo_loose       0.8668      0.9157      0.8363      0.9881      0.9898  0.9193
+pseudo_strict      0.8602      0.9129      0.8272      0.9936      0.9943  0.9176
+    candidate  mean_roc_auc  worst_roc_auc  mean_delta_vs_baseline  min_window_delta  windows_improved  windows  mean_seed_auc_std  adopt
+  shallow_all        0.9480         0.8884                  0.0000            0.0000                 0        5             0.0019  False
+ pseudo_loose        0.9193         0.8363                 -0.0286           -0.0685                 0        5             0.0024  False
+pseudo_strict        0.9176         0.8272                 -0.0303           -0.0776                 0        5             0.0056  False

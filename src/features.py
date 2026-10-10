@@ -6,6 +6,21 @@ from src.data import get_feature_columns
 
 IDENTIFIER_COLUMNS = {"index", "txId", "label", "time_step"}
 
+# The Elliptic documentation lists 94 local features (the first is the time step)
+# followed by 72 one-hop aggregated features. With time_step supplied as its own
+# column, feat_1-feat_93 are the local features and feat_94-feat_165 the aggregates.
+# An attempt to reconstruct the aggregates from neighbour statistics was inconclusive,
+# so this split rests on the dataset documentation (see report/findings.md).
+LAST_LOCAL_FEATURE = 93
+
+
+def get_feature_groups(columns):
+    """Split supplied feat_ columns into documented local and aggregated groups."""
+    supplied = get_feature_columns(columns)
+    local = [column for column in supplied if int(column.split("_")[1]) <= LAST_LOCAL_FEATURE]
+    aggregated = [column for column in supplied if int(column.split("_")[1]) > LAST_LOCAL_FEATURE]
+    return {"all": supplied, "local": local, "aggregated": aggregated}
+
 
 def build_features(train, test, edges=None, include_in_degree=True):
     """Create tabular features plus causal incoming degree for each transaction."""

@@ -1,0 +1,19 @@
+{
+  "ensemble_families_all": {
+    "tuned_lgbm_all": 1.0,
+    "tuned_xgb_all": 1.0,
+    "tuned_catboost_all": 1.0
+  },
+  "ensemble_families_all_no_feat2": {
+    "tuned_lgbm_all_no_feat2": 1.0,
+    "tuned_xgb_all_no_feat2": 1.0
+  },
+  "blend_lgbm_all_local_tunedweight": {
+    "tuned_lgbm_all": 0.9,
+    "tuned_lgbm_local": 0.1
+  },
+  "blend_xgb_all_local_tunedweight": {
+    "tuned_xgb_all": 0.9,
+    "tuned_xgb_local": 0.1
+  }
+}

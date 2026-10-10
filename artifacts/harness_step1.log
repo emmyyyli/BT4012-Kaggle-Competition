@@ -1,0 +1,44 @@
+  t14_v15-35   baseline_all
+  t14_v15-35   shallow_all
+  t14_v15-35   baseline_agg
+  t14_v15-35   shallow_agg
+  t14_v15-35   shallow_local
+  t21_v22-35   baseline_all
+  t21_v22-35   shallow_all
+  t21_v22-35   baseline_agg
+  t21_v22-35   shallow_agg
+  t21_v22-35   shallow_local
+  t21_v22-28   baseline_all
+  t21_v22-28   shallow_all
+  t21_v22-28   baseline_agg
+  t21_v22-28   shallow_agg
+  t21_v22-28   shallow_local
+  t25_v26-35   baseline_all
+  t25_v26-35   shallow_all
+  t25_v26-35   baseline_agg
+  t25_v26-35   shallow_agg
+  t25_v26-35   shallow_local
+  t28_v29-35   baseline_all
+  t28_v29-35   shallow_all
+  t28_v29-35   baseline_agg
+  t28_v29-35   shallow_agg
+  t28_v29-35   shallow_local
+
+=== Seed-bagged ROC-AUC by window ===
+window                 t14_v15-35  t21_v22-28  t21_v22-35  t25_v26-35  t28_v29-35    mean
+candidate                                                                                
+blend_shallow_all_agg      0.9412      0.9625      0.9258      0.9861      0.9876  0.9606
+shallow_all                0.8890      0.9537      0.8998      0.9949      0.9960  0.9467
+shallow_agg                0.9529      0.9482      0.9213      0.9547      0.9536  0.9462
+baseline_all               0.8981      0.9413      0.8770      0.9965      0.9968  0.9419
+baseline_agg               0.9420      0.9397      0.8994      0.9533      0.9523  0.9374
+shallow_local              0.8760      0.9433      0.8736      0.9944      0.9950  0.9364
+
+=== Summary vs baseline_all ===
+            candidate  mean_roc_auc  worst_roc_auc  mean_delta_vs_baseline  min_window_delta  windows_improved  windows  mean_seed_auc_std  adopt
+blend_shallow_all_agg        0.9606         0.9258                  0.0187           -0.0103                 3        5             0.0020  False
+          shallow_all        0.9467         0.8890                  0.0047           -0.0090                 2        5             0.0032   True
+          shallow_agg        0.9462         0.9213                  0.0042           -0.0432                 3        5             0.0016  False
+         baseline_all        0.9419         0.8770                  0.0000            0.0000                 0        5             0.0039  False
+         baseline_agg        0.9374         0.8994                 -0.0046           -0.0445                 2        5             0.0015  False
+        shallow_local        0.9364         0.8736                 -0.0055           -0.0221                 1        5             0.0051  False

@@ -1,0 +1,108 @@
+  t25_v26-35   shallow_all
+  t25_v26-35   tuned_lgbm_all
+  t25_v26-35   tuned_lgbm_all_no_feat2
+  t25_v26-35   tuned_lgbm_local
+  t25_v26-35   tuned_xgb_all
+  t25_v26-35   tuned_xgb_all_no_feat2
+  t25_v26-35   tuned_xgb_local
+  t25_v26-35   tuned_catboost_all
+  t25_v26-35   tuned_lgbm_all_no_test_drift5
+  t28_v29-35   shallow_all
+  t28_v29-35   tuned_lgbm_all
+  t28_v29-35   tuned_lgbm_all_no_feat2
+  t28_v29-35   tuned_lgbm_local
+  t28_v29-35   tuned_xgb_all
+  t28_v29-35   tuned_xgb_all_no_feat2
+  t28_v29-35   tuned_xgb_local
+  t28_v29-35   tuned_catboost_all
+  t28_v29-35   tuned_lgbm_all_no_test_drift5
+  t14_v15-35   shallow_all
+  t14_v15-35   tuned_lgbm_all
+  t14_v15-35   tuned_lgbm_all_no_feat2
+  t14_v15-35   tuned_lgbm_local
+  t14_v15-35   tuned_xgb_all
+  t14_v15-35   tuned_xgb_all_no_feat2
+  t14_v15-35   tuned_xgb_local
+  t14_v15-35   tuned_catboost_all
+  t14_v15-35   tuned_lgbm_all_no_test_drift5
+  t21_v22-35   shallow_all
+  t21_v22-35   tuned_lgbm_all
+  t21_v22-35   tuned_lgbm_all_no_feat2
+  t21_v22-35   tuned_lgbm_local
+  t21_v22-35   tuned_xgb_all
+  t21_v22-35   tuned_xgb_all_no_feat2
+  t21_v22-35   tuned_xgb_local
+  t21_v22-35   tuned_catboost_all
+  t21_v22-35   tuned_lgbm_all_no_test_drift5
+  t21_v22-28   shallow_all
+  t21_v22-28   tuned_lgbm_all
+  t21_v22-28   tuned_lgbm_all_no_feat2
+  t21_v22-28   tuned_lgbm_local
+  t21_v22-28   tuned_xgb_all
+  t21_v22-28   tuned_xgb_all_no_feat2
+  t21_v22-28   tuned_xgb_local
+  t21_v22-28   tuned_catboost_all
+  t21_v22-28   tuned_lgbm_all_no_test_drift5
+window                            t14_v15-35  t21_v22-28  t21_v22-35  t25_v26-35  t28_v29-35    mean
+candidate                                                                                           
+tuned_lgbm_all_no_feat2               0.9180      0.9582      0.9149      0.9929      0.9943  0.9557
+ensemble_families_all_no_feat2        0.9134      0.9580      0.9153      0.9907      0.9930  0.9541
+tuned_lgbm_all_no_test_drift5         0.9129      0.9546      0.9087      0.9967      0.9972  0.9540
+tuned_lgbm_all                        0.9003      0.9590      0.9119      0.9953      0.9961  0.9525
+blend_lgbm_all_local_tunedweight      0.8965      0.9590      0.9114      0.9956      0.9964  0.9518
+tuned_xgb_all_no_feat2                0.9074      0.9571      0.9144      0.9872      0.9909  0.9514
+ensemble_families_all                 0.9002      0.9551      0.9047      0.9946      0.9956  0.9501
+tuned_catboost_all                    0.9200      0.9472      0.8912      0.9943      0.9950  0.9495
+shallow_all                           0.8890      0.9537      0.8998      0.9949      0.9960  0.9467
+tuned_xgb_all                         0.8757      0.9559      0.9060      0.9920      0.9942  0.9448
+blend_xgb_all_local_tunedweight       0.8734      0.9566      0.9054      0.9931      0.9950  0.9447
+tuned_lgbm_local                      0.8600      0.9518      0.8969      0.9940      0.9947  0.9395
+tuned_xgb_local                       0.8516      0.9517      0.8824      0.9934      0.9938  0.9346
+                       candidate  mean_roc_auc  worst_roc_auc  mean_delta_vs_baseline  min_window_delta  windows_improved  windows  mean_seed_auc_std  adopt
+         tuned_lgbm_all_no_feat2        0.9557         0.9149                  0.0090           -0.0020                 3        5             0.0010   True
+  ensemble_families_all_no_feat2        0.9541         0.9134                  0.0074           -0.0042                 3        5             0.0008   True
+   tuned_lgbm_all_no_test_drift5        0.9540         0.9087                  0.0073            0.0009                 5        5             0.0014   True
+                  tuned_lgbm_all        0.9525         0.9003                  0.0058            0.0001                 5        5             0.0018   True
+blend_lgbm_all_local_tunedweight        0.9518         0.8965                  0.0051            0.0003                 5        5             0.0014   True
+          tuned_xgb_all_no_feat2        0.9514         0.9074                  0.0047           -0.0077                 3        5             0.0011   True
+           ensemble_families_all        0.9501         0.9002                  0.0034           -0.0004                 3        5             0.0013   True
+              tuned_catboost_all        0.9495         0.8912                  0.0029           -0.0085                 1        5             0.0031   True
+                     shallow_all        0.9467         0.8890                  0.0000            0.0000                 0        5             0.0032  False
+                   tuned_xgb_all        0.9448         0.8757                 -0.0019           -0.0133                 2        5             0.0020  False
+ blend_xgb_all_local_tunedweight        0.9447         0.8734                 -0.0020           -0.0156                 2        5             0.0019  False
+                tuned_lgbm_local        0.9395         0.8600                 -0.0072           -0.0290                 0        5             0.0031  False
+                 tuned_xgb_local        0.9346         0.8516                 -0.0121           -0.0374                 0        5             0.0025  False
+{
+  "lgbm": {
+    "chosen_local_weight": 0.1,
+    "tuning_scores": {
+      "0.0": 0.9724551060909571,
+      "0.1": 0.9724730695523416,
+      "0.2": 0.972301265641331,
+      "0.3": 0.9719768915644549,
+      "0.4": 0.971543958266967,
+      "0.5": 0.9710096237006359,
+      "0.6": 0.9704001444562818,
+      "0.7": 0.9696604854369916,
+      "0.8": 0.968795845617142,
+      "0.9": 0.9677847308467294,
+      "1.0": 0.9666326010050174
+    }
+  },
+  "xgb": {
+    "chosen_local_weight": 0.1,
+    "tuning_scores": {
+      "0.0": 0.9697986706232039,
+      "0.1": 0.9698705059140806,
+      "0.2": 0.9697697331985373,
+      "0.3": 0.9694400349328226,
+      "0.4": 0.9689141480953802,
+      "0.5": 0.9681946192517704,
+      "0.6": 0.9672654778346449,
+      "0.7": 0.9661018571241929,
+      "0.8": 0.9647484446484585,
+      "0.9": 0.9632152129801398,
+      "1.0": 0.9614944153355255
+    }
+  }
+}

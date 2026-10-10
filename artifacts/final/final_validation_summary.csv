@@ -1,0 +1,3 @@
+candidate,mean_roc_auc,worst_roc_auc,mean_delta_vs_baseline,min_window_delta,windows_improved,windows,mean_seed_auc_std,adopt
+tuned_lgbm_all_no_test_drift5,0.9541664490571587,0.9093247506620883,0.013409422788908665,0.0002712884639222146,5,5,0.0016673639577983086,True
+original_lgbm,0.9407570262682501,0.8736823825589871,0.0,0.0,0,5,0.004818614522158061,False
