@@ -441,9 +441,172 @@ Kaggle scores within noise), vs shallow_all 0.974, vs no_feat2 0.959.
 
 | File | Purpose | Public AUC |
 |---|---|---|
-| `submission_tuned_lgbm_all_no_test_drift5.csv` | provisional final model | _pending_ |
-| `submission_tuned_lgbm_all_no_feat2.csv` | best all-window mean; tests the feat_2-only drop | _pending_ |
-| `submission_tuned_lgbm_all.csv` | tuning alone vs shallow_all (0.94267); rank ρ 0.994 with drift5, so low information | _pending_ |
+| `submission_tuned_lgbm_all_no_test_drift5.csv` | provisional final model | **0.94365** (2026-10-11) |
+| `submission_tuned_lgbm_all_no_feat2.csv` | best all-window mean; tests the feat_2-only drop | **0.93673** (2026-10-11) |
+| `submission_tuned_lgbm_all.csv` | tuning alone vs shallow_all (0.94267); rank ρ 0.994 with drift5, so low information | **0.94417** (2026-10-11) |
 
 **Final private-leaderboard picks (2 allowed):** the best round-2 model if it beats 0.94267
 by more than the ~0.005 noise level; otherwise drift5 plus `shallow_all` (0.94267).
+
+## 11. Kaggle round 2 (2026-10-11) — a plateau at about 0.944
+
+Leaderboard leader at this point: **0.96849** public.
+
+| Submission | Public ROC-AUC | Short windows ≤25 / ≤28 (local) | Mean of 5 windows (local) |
+|---|---|---|---|
+| **tuned_lgbm_all** | **0.94417** | 0.9953 / 0.9961 | 0.9525 |
+| tuned_lgbm_all_no_test_drift5 | 0.94365 | 0.9967 / 0.9972 | 0.9540 |
+| shallow_all (round 1) | 0.94267 | 0.9949 / 0.9960 | 0.9467 |
+| original (time_step + in_degree) | 0.94246 | — | — |
+| tuned_lgbm_all_no_feat2 | 0.93673 | 0.9929 / 0.9943 | 0.9557 |
+
+**Implications.**
+1. **Tuning helps only marginally on test.** tuned_lgbm_all beats shallow_all by +0.0015
+   and the original model by +0.0017, both within public-LB noise (~±0.005). Five tree
+   variants now span 0.9367–0.9442. The supplied-feature gradient-boosting approach has hit a
+   plateau about 0.025 below the leader.
+2. **Dropping the test-drifted features does not help on test** (−0.0005 vs tuned_lgbm_all,
+   noise). The drift diagnosis (§6) explains why aggregated-only failed, but removing the
+   drifted columns from an all-feature model is neutral. The trees evidently do not rely on
+   them in a harmful way.
+3. **Dropping feat_2 alone hurts (−0.0074).** That matches its position as the weakest
+   finalist on the short windows: short-window validation predicted the bottom of the ranking
+   again (3 of 3 rounds directionally right for differences larger than ~0.005). It is
+   confounded with that model's different hyperparameters (4 leaves, 1200 trees), so it does
+   not show that feat_2 itself matters.
+4. **The local proxy is saturated.** The Kaggle-aligned short windows score 0.995–0.997,
+   while the test scores 0.944. They can rank large differences but cannot resolve the
+   +0.01–0.02 improvements now needed. The long windows (0.90–0.92) match the test's
+   difficulty level but ranked feature groups wrongly. No single local window both matches the
+   test difficulty and ranks correctly. From here the public leaderboard has to serve as the
+   validation set for close calls. With about 13 days × 3 submissions left there is budget for
+   that, but only differences above ~0.005 are informative, and the private LB (70%) decides
+   the grade.
+5. **Grade arithmetic** (score = 10 × (AUC / best)^5, using the current public leader as
+   proxy): 0.94417 → 8.81 / 10; 0.955 → 9.32; 0.960 → 9.57. Each +0.005 AUC is worth about
+   0.25 points.
+
+### 11.1 Diagnostics run after round 2 (2026-10-11)
+
+**Homophily is strong, and labeled-neighbour structure is consistent between train and test.**
+- On training edges whose endpoints are both labeled (23,900), a neighbour of an illicit
+  transaction is illicit 57.4% of the time, against a base rate of 11.7% (4.9× lift). Label
+  agreement across an edge is 94.7%.
+- Restricted to *labeled* neighbours (the only neighbours with features in the test period),
+  training and test look alike: 78.2% vs 74.6% of nodes have at least one labeled neighbour,
+  and labeled neighbours make up 63.1% vs 60.9% of all neighbours. Neighbour features computed
+  over labeled neighbours only therefore avoid the mismatch that broke GraphSAGE (§1.3).
+- Univariate AUCs on labeled training rows: number of labeled neighbours 0.324 (i.e. 0.676 when
+  inverted: illicit transactions have fewer labeled neighbours), in-degree 0.458, out-degree
+  0.417. Oracle mean neighbour label: 0.777 on the 78% of rows with labeled neighbours. That
+  oracle uses true labels, so it is only an upper bound.
+
+**Pilot: two-stage labeled-neighbour stacking** (code: scratchpad pilot, results
+`artifacts/extensions/stacking_pilot_window_table.csv`).
+- Stage 1 is tuned_lgbm_all. Training-window rows are scored out-of-fold (5 folds of time
+  steps); validation rows by the window model.
+- Stage 2 adds the mean/max/in-mean/out-mean of stage-1 scores over labeled neighbours, plus
+  degree and labeled-neighbour counts. 2 seeds.
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean |
+|---|---|---|---|---|---|---|
+| base (tuned_lgbm_all) | 0.8991 | 0.9587 | 0.9117 | 0.9953 | 0.9960 | 0.9522 |
+| + structure | 0.9009 | 0.9563 | 0.9037 | 0.9954 | 0.9964 | 0.9505 |
+| + neighbour scores | 0.8948 | 0.9554 | 0.9010 | 0.9961 | 0.9975 | 0.9490 |
+| + both | 0.8955 | 0.9524 | 0.8928 | 0.9960 | 0.9974 | 0.9468 |
+
+Neighbour scores add +0.0008 / +0.0015 on the short windows and lose 0.004–0.01 on the long
+ones. Under the adoption rule this is not adopted on local evidence. Because the short windows
+are saturated, a single Kaggle submission is the only way to judge it properly.
+
+**Leakage check (negative).** Transaction ID vs label: AUC 0.560 pooled, 0.545 within step.
+File row order: 0.656 pooled but 0.566 within step, so the pooled figure reflects how fraud
+prevalence varies by step. Neither offers a usable shortcut, and none was used.
+
+**Per-step score calibration is not the bottleneck** (`artifacts/extensions/prior_shift_pilot.csv`).
+On long windows, pooled AUC is 0.02–0.03 below the mean within-step AUC, which suggested that
+scores were mis-levelled between steps. Adjusting each step's scores to a new illicit prior,
+mean over 5 windows (tuned_lgbm_all = 0.9525):
+- EM prior estimate (Saerens et al., 2002): 0.9440;
+- mean-probability prior: 0.9511;
+- oracle true per-step prevalence: 0.9571;
+- per-step percentile ranking: worse on every window (e.g. 0.8710 vs 0.9119).
+
+Even perfect prevalence knowledge adds only +0.0046, and the practical estimators lose. The gap
+comes from a few steps where within-step ranking itself fails (§3: steps 24, 29, 31, 32), not
+from miscalibration.
+
+### 11.2 Final-pick status
+- Best public score: tuned_lgbm_all (0.94417). It is simpler than drift5 (no arbitrary drops)
+  and within noise of it.
+- Recommended config change: `src/final_config.py` → tuned_lgbm_all.
+- Recommended private-LB picks today: **tuned_lgbm_all** + **shallow_all** (ρ 0.973 between
+  them, both ≥ 0.9427). drift5 is a near-duplicate of tuned_lgbm_all (ρ 0.994), so picking
+  both would waste the second pick's diversity.
+
+## 12. Proposed next steps (2026-10-11)
+
+The supplied features plus gradient boosting appear to be at a plateau of about 0.944. Closing
+part of the 0.025 gap needs **new information or a different training distribution**, not more
+tuning. Local windows are saturated, so each idea gets a quick local sanity check (it must not
+lose more than 0.01 on any window) and is then judged on Kaggle. Ordered by expected value per
+effort:
+
+| # | Idea | Why it might help | Local evidence so far | Cost |
+|---|---|---|---|---|
+| 1 | **Recency-focused training**: train only on steps ≥ 15 / ≥ 22, or exponential recency weights (half-life 7–14) on the tuned model | Test starts right after step 35, and the hard steps (29, 32) carry recent fraud patterns. The earlier recency test used the old deep model on a single long holdout. | Half-life 3 improved the ≤28 window slightly (README); never tested with tuned params on short windows | low |
+| 2 | **Temporal bagging**: average tuned LightGBMs trained on different start windows (1–35, 10–35, 20–35) and seeds | Combines long-memory and recent-pattern models without choosing between them; variance reduction | — | low |
+| 3 | **Labeled-neighbour stacking** (pilot above) | Strong homophily (4.9× lift) and a train/test-consistent neighbourhood rule; the only new information source left in the data | +0.001 short / −0.004 to −0.01 long | medium |
+| 4 | **Covariate-shift importance weighting**: weight training rows by p(test \| x) / p(train \| x) from an adversarial classifier that excludes the 5 time-proxy features (Sugiyama et al., 2007) | Focuses the model on training transactions resembling the test period | not testable locally (the shift exists only train→test) | medium |
+| 5 | **De-trend only the drifted aggregated features**: per-step robust standardisation of the top ~10 train-vs-test separators, leaving the rest raw | Keeps their within-step signal while removing the level drift | Ranking *all* features per step hurt (0.845); targeted version untested | low |
+| 6 | **Per-time-step error analysis on the hard validation steps** (24, 29, 31, 32): which features flip, and whether illicit transactions there form new clusters | Tells us whether the test's difficulty is new fraud typologies (favours ideas 1, 3) or feature drift (favours 4, 5) | — | low |
+
+**Suggested Kaggle schedule** (3 per day; days 1–2 shown):
+- **Day 3:** recency variant (#1), temporal bag (#2), neighbour stacking (#3), all on the
+  tuned_lgbm_all base.
+- **Day 4:** the best of day 3 combined with #4 or #5, plus one seed/variance check of the best.
+- **Afterwards:** keep two slots a day for combinations and one for re-checking.
+
+**Not recommended:** further hyperparameter search, cross-family ensembles, GraphSAGE variants,
+pseudo-labeling and aggregated-only models (all tested; §5–§9, §11). External data such as the
+Elliptic++ wallet features is out unless the competition rules allow it.
+
+**Deliverable housekeeping** (independent of model work): switch `final_config.py` to
+tuned_lgbm_all and rebuild the notebook; start the 4-page report from §1, §3, §6, §8 and §11,
+which carry the main narrative; the final two picks are listed in §11.2.
+
+## 13. Round 3 variants (2026-10-12)
+
+**Code:** `src/run_step8_variants.py` (tests: `tests/test_round3_variants.py`); outputs in
+`artifacts/round3/`. All variants are built on tuned_lgbm_all's settings and use all 165
+features. Local sanity check: report windows, 2 seeds.
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean | Adoption rule |
+|---|---|---|---|---|---|---|---|
+| temporal_bag (all / last 25 / last 15 steps, rank-averaged) | 0.8984 | 0.9581 | **0.9145** | 0.9963 | 0.9972 | **0.9529** | pass (worst −0.0007) |
+| halflife_14 (recency weights) | 0.9061 | 0.9560 | 0.9078 | 0.9965 | 0.9973 | 0.9527 | pass (worst −0.0040) |
+| recent_21 (last 21 steps only) | 0.8991 | 0.9587 | 0.9117 | 0.9964 | 0.9973 | 0.9526 | pass (0.0000) |
+| tuned_lgbm_all (reference; Kaggle 0.94417) | 0.8991 | 0.9587 | 0.9117 | 0.9953 | 0.9960 | 0.9522 | — |
+| halflife_7 | **0.9125** | 0.9519 | 0.9018 | **0.9968** | **0.9975** | 0.9521 | fail (−0.0100) |
+| nbr_stack (labeled-neighbour stacking) | 0.8948 | 0.9554 | 0.9010 | 0.9961 | **0.9975** | 0.9490 | fail (−0.0107) |
+| recent_14 | 0.8991 | 0.9384 | 0.8844 | 0.9968 | 0.9974 | 0.9432 | fail (−0.0274) |
+
+(For windows that start at step ≤ 14, "last 21 steps" covers all training steps, which is why
+recent_21 equals the reference there.)
+
+Every recency-type variant lifts the two Kaggle-aligned short windows by +0.001 to +0.0015.
+That is consistent, but small and close to the windows' ceiling. nbr_stack is submitted despite
+failing the rule because it is the only variant that adds new information (§11.1), and only
+Kaggle can measure it.
+
+**Kaggle round 3 queue** (10-seed bags; test rank correlation with tuned_lgbm_all: halflife_14
+0.992, temporal_bag 0.985, nbr_stack 0.977):
+
+| File | Purpose | Public AUC |
+|---|---|---|
+| `submission_halflife_14.csv` | recency weighting (idea #1) | _pending_ |
+| `submission_temporal_bag.csv` | temporal bagging (idea #2) | _pending_ |
+| `submission_nbr_stack.csv` | labeled-neighbour stacking (idea #3) | _pending_ |
+
+**Final config switched to tuned_lgbm_all** (best public score so far, 0.94417);
+`src/final_config.py` keeps the drift5 drop list documented but unused.

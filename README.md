@@ -27,9 +27,9 @@ python -m pytest                     # unit tests
 ```
 
 The final model is defined in [`src/final_config.py`](src/final_config.py): a tuned,
-shallow LightGBM (9 leaves, 500 trees) on the 165 supplied features minus the five features
-that drift most between the training and test periods (`feat_103`, `feat_136`, `feat_101`,
-`feat_2`, `feat_139`). It is averaged over 10 seeds.
+shallow LightGBM (9 leaves, 500 trees) on all 165 supplied features, averaged over 10 seeds
+(public ROC-AUC 0.94417). A variant without the five most test-drifted features scored 0.94365,
+within noise, so the simpler model was kept.
 
 ## Key findings
 
@@ -55,8 +55,11 @@ that drift most between the training and test periods (`feat_103`, `feat_136`, `
 | `shallow_all` (regularised LightGBM, 10 seeds) | 0.94267 |
 | 50/50 rank blend all-features + aggregated-only | 0.92624 |
 | `shallow_agg` (aggregated features only) | 0.88023 |
+| `tuned_lgbm_all` (final model) | **0.94417** |
+| `tuned_lgbm_all` minus five test-drifted features | 0.94365 |
+| `tuned_lgbm_all_no_feat2` | 0.93673 |
 
-Round-2 scores for the tuned models are recorded in `report/findings.md`.
+Later rounds are recorded in `report/findings.md`.
 
 ## Experiment scripts
 
@@ -67,6 +70,7 @@ Round-2 scores for the tuned models are recorded in `report/findings.md`.
 | `src/run_step3_features.py` | Correlated-cluster ablation, TreeSHAP stability, adversarial feature dropping |
 | `src/run_step4_tuning.py` | Optuna tuning (LightGBM / XGBoost / CatBoost) on short-horizon windows; ensemble evaluation |
 | `src/run_step5_stress.py` | Stress tests: extra drift, feature noise, withheld fraud-heavy steps, rare positives |
+| `src/run_step8_variants.py` | Round-3 variants: recency weighting, temporal bagging, labeled-neighbour stacking |
 | `src/run_step6_extensions.py` | Directed GraphSAGE with test-consistent masking (`src/gnn_v2.py`); pseudo-labeling |
 | `src/run_feature_experiments.py`, `src/run_feature_importance.py`, `src/run_lgbm_robustness_experiments.py`, `src/run_graph_benchmark.py`, `src/gt_ssl_extractor.py` | Earlier single-holdout experiments (degree features, permutation importance, recency weighting, first GraphSAGE, GT-SSL embedding pilot) |
 

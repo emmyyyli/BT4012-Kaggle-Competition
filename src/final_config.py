@@ -11,7 +11,7 @@ Selection evidence: report/findings.md.
 
 from src.model_zoo import SHALLOW_LGBM_PARAMS
 
-FINAL_NAME = "tuned_lgbm_all_no_test_drift5"
+FINAL_NAME = "tuned_lgbm_all"
 FINAL_SEEDS = tuple(range(10))
 
 # Tuned LightGBM settings (Optuna, short-horizon tuning windows; report/findings.md section 8).
@@ -27,16 +27,19 @@ TUNED_LGBM_PARAMS = dict(
 )
 
 # The five features that best separate labeled training rows from Kaggle test rows
-# (adversarial validation, no labels; report/findings.md sections 5.3, 6 and 8).
+# (adversarial validation, no labels; report/findings.md sections 5.3, 6, 8 and 11).
+# Tested as a variant; not used by the final model.
 TEST_DRIFTED_FEATURES = ["feat_103", "feat_136", "feat_101", "feat_2", "feat_139"]
 
 # family: lgbm | xgb | catboost; feature_set: all | local | aggregated; drop: columns removed.
+# Kaggle public: tuned_lgbm_all 0.94417, the same model without TEST_DRIFTED_FEATURES 0.94365
+# (within noise), shallow_all 0.94267. The simpler model without drops is used.
 FINAL_MEMBERS = [
     {
-        "name": "tuned_lgbm_all_no_test_drift5",
+        "name": "tuned_lgbm_all",
         "family": "lgbm",
         "feature_set": "all",
-        "drop": list(TEST_DRIFTED_FEATURES),
+        "drop": [],
         "params": dict(TUNED_LGBM_PARAMS),
         "weight": 1.0,
     },

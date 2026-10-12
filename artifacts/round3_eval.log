@@ -1,0 +1,22 @@
+  t14_v15-35
+  t21_v22-35
+  t21_v22-28
+  t25_v26-35
+  t28_v29-35
+window          t14_v15-35  t21_v22-28  t21_v22-35  t25_v26-35  t28_v29-35    mean
+candidate                                                                         
+temporal_bag        0.8984      0.9581      0.9145      0.9963      0.9972  0.9529
+halflife_14         0.9061      0.9560      0.9078      0.9965      0.9973  0.9527
+recent_21           0.8991      0.9587      0.9117      0.9964      0.9973  0.9526
+tuned_lgbm_all      0.8991      0.9587      0.9117      0.9953      0.9960  0.9522
+halflife_7          0.9125      0.9519      0.9018      0.9968      0.9975  0.9521
+nbr_stack           0.8948      0.9554      0.9010      0.9961      0.9975  0.9490
+recent_14           0.8991      0.9384      0.8844      0.9968      0.9974  0.9432
+     candidate  mean_roc_auc  worst_roc_auc  mean_delta_vs_baseline  min_window_delta  windows_improved  windows  mean_seed_auc_std  adopt
+  temporal_bag        0.9529         0.8984                  0.0007           -0.0007                 3        5             0.0017   True
+   halflife_14        0.9527         0.9061                  0.0006           -0.0040                 3        5             0.0006   True
+     recent_21        0.9526         0.8991                  0.0005            0.0000                 2        5             0.0018   True
+tuned_lgbm_all        0.9522         0.8991                  0.0000            0.0000                 0        5             0.0019  False
+    halflife_7        0.9521         0.9018                 -0.0001           -0.0100                 3        5             0.0019  False
+     nbr_stack        0.9490         0.8948                 -0.0032           -0.0107                 2        5             0.0040  False
+     recent_14        0.9432         0.8844                 -0.0089           -0.0274                 2        5             0.0038  False
