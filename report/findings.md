@@ -604,9 +604,237 @@ Kaggle can measure it.
 
 | File | Purpose | Public AUC |
 |---|---|---|
-| `submission_halflife_14.csv` | recency weighting (idea #1) | _pending_ |
-| `submission_temporal_bag.csv` | temporal bagging (idea #2) | _pending_ |
-| `submission_nbr_stack.csv` | labeled-neighbour stacking (idea #3) | _pending_ |
+| `submission_halflife_14.csv` | recency weighting (idea #1) | **0.95066** (2026-10-12) |
+| `submission_temporal_bag.csv` | temporal bagging (idea #2) | **0.94672** (2026-10-12) |
+| `submission_nbr_stack.csv` | labeled-neighbour stacking (idea #3) | **0.95389** (2026-10-12) |
 
 **Final config switched to tuned_lgbm_all** (best public score so far, 0.94417);
 `src/final_config.py` keeps the drift5 drop list documented but unused.
+
+## 14. Kaggle round 3 (2026-10-12) — two real gains: neighbours and recency
+
+| Submission | Public ROC-AUC | Δ vs tuned_lgbm_all (0.94417) | Local mean (5 windows) | Local adoption rule |
+|---|---|---|---|---|
+| **nbr_stack** | **0.95389** | **+0.0097** | 0.9490 | fail (−0.0107) |
+| halflife_14 | 0.95066 | +0.0065 | 0.9527 | pass |
+| temporal_bag | 0.94672 | +0.0026 (noise) | 0.9529 | pass |
+| tuned_lgbm_all | 0.94417 | — | 0.9522 | — |
+
+Leader 0.96849; gap now 0.0146 (was 0.0243). Grade proxy 10 × (0.95389/0.96849)^5 = **9.27**
+(was 8.81).
+
+**Main drivers.**
+1. **Labeled-neighbour information (+0.0097).** This is the first gain from information beyond
+   a transaction's own supplied features. It works because (a) illicit transactions cluster:
+   57% of an illicit transaction's labeled neighbours are illicit, against 11.7% base (§11.1);
+   and (b) the neighbourhood is defined so that it means the same thing in training and test:
+   only *labeled* neighbours (the only ones with features in steps 36–49), scored by a model
+   that never sees their labels. GraphSAGE failed on exactly the second point (§1.3, §7).
+2. **Recency weighting (+0.0065).** Weighting training rows by 2^((t − 35)/14) (step 35 = 1.0,
+   step 21 = 0.5, step 7 = 0.25) shifts the model toward the most recent fraud patterns. That
+   suits a test period that starts right after step 35.
+3. Temporal bagging is directionally positive but within noise; it averages full-history and
+   recent models, a weaker form of driver 2.
+
+**What the stacked model relies on** (1-seed diagnostic refit on all labeled rows):
+- the four neighbour-score features carry 22.5% of stage-2 training gain but only 7.0% of mean
+  |SHAP| on test rows. Ranked by test SHAP: in-neighbour mean 10th, overall mean 12th,
+  out-neighbour mean 19th, max 40th;
+- 74.6% of test rows have at least one labeled neighbour (78.2% of training rows);
+- stage 2 moves test ranks more for rows *with* labeled neighbours (mean |Δ percentile| 0.054)
+  than without (0.045). Rows without neighbours also move, so part of the gain may come from
+  stage 2 re-learning the base features with a different tree structure, not only from
+  neighbour information. A dedicated ablation would be needed to separate the two;
+- rank moves are similar before and after the step-43 shutdown (0.051 vs 0.053).
+- The smaller SHAP share on test than on training suggests that test neighbour scores (from the
+  full stage-1 model) are distributed differently from training neighbour scores (out-of-fold).
+  Aligning the two is a possible further gain (§15, idea C).
+
+**Validation lesson.** Local windows predicted neither gain. nbr_stack *failed* the local rule
+and halflife_14 showed only +0.0005. Local windows fall short in both directions: they reward
+the wrong feature groups (§6) and miss the right ideas (here). For this competition the public
+LB is the only reliable selector for changes of ±0.005–0.01. The private LB (70%) may still
+differ, which argues for picking two *different* strong models at the end.
+
+### 14.1 Current best model — `nbr_stack` (exact specification)
+
+| Component | Setting |
+|---|---|
+| Training rows | 31,235 labeled transactions, steps 1–35 (`none` rows excluded); `time_step` never a feature |
+| Base features | all 165 supplied features (`feat_1`–`feat_165`) |
+| Model (both stages) | LightGBM, binary, `class_weight="balanced"`, 500 trees, learning rate 0.0253, 9 leaves, min_child_samples 49, colsample_bytree 0.644, subsample 0.983 (subsample_freq 1), reg_lambda 2.04 — Optuna-tuned on short-horizon windows (§8) |
+| Stage 1 | Training rows: out-of-fold scores, 5 folds of consecutive time steps (each fold's steps scored by a model trained on the other steps). Test rows: a model trained on all labeled rows |
+| Neighbour features | Edge list in both directions; for each transaction, over neighbours that are labeled training rows or test rows: mean, max, mean over incoming (predecessor) neighbours, mean over outgoing (successor) neighbours of stage-1 scores. NaN when there are no labeled neighbours (LightGBM's missing-value branch) |
+| Stage 2 | Same LightGBM settings on 165 + 4 = 169 features |
+| Seeds | 10 (0–9); each seed repeats both stages; test probabilities averaged |
+| Code | `src/run_step8_variants.py` (`neighbour_stack`), `python -m src.run_step8_variants submit nbr_stack` |
+
+`halflife_14` uses the same LightGBM settings and 165 features, with sample weights
+2^((t − t_max)/14) normalised to mean 1, multiplied into the class-balancing weights; 10 seeds.
+
+Test rank correlation nbr_stack vs halflife_14: 0.968, different enough to make a good pair of
+final picks.
+
+**Final picks as of today:** nbr_stack (0.95389) + halflife_14 (0.95066).
+
+## 15. Proposed next steps after round 3 (2026-10-12)
+
+Ordered by expected value; each is one Kaggle submission (the local check only guards against
+breakage).
+
+| # | Idea | Rationale |
+|---|---|---|
+| A | **Combine the two drivers**: nbr_stack with half-life-14 recency weights in both stages | The gains come from independent mechanisms (graph context vs temporal drift), so they may add up |
+| B | **Rank blend** nbr_stack + halflife_14 (50/50) | Cheap; ρ = 0.968, so the blend has diversity to exploit |
+| C | **Richer, better-aligned neighbour features**: counts of labeled neighbours, in/out degree, and neighbour aggregates of the top local features (feat_53, feat_59, feat_61, feat_5, feat_3) over labeled neighbours; also score test neighbours out-of-fold, using an ensemble of the 5 fold models instead of the full model, so training and test neighbour scores come from the same kind of model | Targets the train/test SHAP-share mismatch above and adds non-score neighbour context |
+| D | **Iterative (collective) classification**: repeat stage 2 using stage-2 neighbour scores (2–3 rounds; Lu & Getoor 2003; Neville & Jensen 2000) | Propagates evidence along fraud chains beyond one hop |
+| E | **Two-hop neighbour scores** (mean score of labeled neighbours-of-neighbours) | Laundering chains are often longer than one hop |
+| F | **Half-life sweep** (7, 10, 21) on the best stacked model | 14 was a guess; 7 was best on the Kaggle-aligned windows locally |
+
+Suggested schedule: day 4 → A, B, C; day 5 → D or E on the day-4 winner, plus F.
+
+**Deliverables:** once the final approach is settled, move the stacking pipeline into
+`src/train.py` / `final_config.py` (currently tuned_lgbm_all) and rebuild `e1304439.ipynb`, so
+the notebook reproduces the best submission.
+
+## 16. Round 4 variants (2026-10-13)
+
+**Code:** `src/run_step8_variants.py` (`make_neighbour_stack`, `neighbour_context_features`,
+`blend` command); tests in `tests/test_round3_variants.py`; outputs `artifacts/round4.log`,
+`artifacts/round3/round4_*.csv`.
+
+- **A, `nbr_stack_hl14`:** nbr_stack with recency weights 2^((t − t_last)/14) (mean one) in
+  stage 1, its out-of-fold fits and stage 2. The reference step is the last training step for
+  every fit, so the out-of-fold models weight steps the same way as the full model.
+- **B, `blend_nbr_hl14`:** equal-weight rank average of the scored files
+  `submission_nbr_stack.csv` (0.95389) and `submission_halflife_14.csv` (0.95066).
+- **C, `nbr_stack_rich`:** nbr_stack plus
+  - in/out degree over the full edge list;
+  - the number and share of labeled neighbours;
+  - neighbour means of feat_53, feat_59, feat_61, feat_5, feat_3 (the top test-SHAP local
+    features, §14) over labeled neighbours;
+  - target (test) neighbour scores taken as the mean of the 5 out-of-fold stage-1 models
+    instead of a separate full-data model, so training and test neighbour scores come from the
+    same kind of model.
+
+  No recency weights, so A and C each test one change against nbr_stack.
+
+Local sanity check (2 seeds):
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean |
+|---|---|---|---|---|---|---|
+| tuned_lgbm_all (Kaggle 0.94417) | 0.8991 | 0.9587 | 0.9117 | 0.9953 | 0.9960 | 0.9522 |
+| nbr_stack (Kaggle 0.95389) | 0.8948 | 0.9554 | 0.9010 | 0.9961 | 0.9975 | 0.9490 |
+| **nbr_stack_hl14** | 0.8994 | 0.9525 | 0.8971 | **0.9972** | **0.9981** | 0.9489 |
+| nbr_stack_rich | 0.8940 | 0.9486 | 0.8878 | 0.9961 | 0.9978 | 0.9449 |
+
+As with nbr_stack, every stacked variant loses on the long windows and gains on the
+Kaggle-aligned short windows. nbr_stack_hl14 posts the highest short-window scores of any model
+so far. nbr_stack_rich matches nbr_stack on short windows and loses more on long ones. Given §14
+(local windows missed nbr_stack's +0.0097), these numbers serve only as a breakage check.
+
+Test rank correlations: A vs nbr_stack 0.991, C vs nbr_stack 0.992, B vs nbr_stack 0.992,
+A vs C 0.983.
+
+**Kaggle round 4 queue:**
+
+| File | Purpose | Public AUC |
+|---|---|---|
+| `submission_nbr_stack_hl14.csv` | A — do the two drivers add up? | **0.95858** (2026-10-13) |
+| `submission_blend_nbr_hl14.csv` | B — blend of the two best files | **0.95328** (2026-10-13) |
+| `submission_nbr_stack_rich.csv` | C — richer, aligned neighbour context | **0.95871** (2026-10-13) |
+
+## 17. Kaggle round 4 (2026-10-13) — graph context keeps paying; blending with a non-graph model does not
+
+| Submission | Public ROC-AUC | Δ vs nbr_stack (0.95389) | What changed |
+|---|---|---|---|
+| **nbr_stack_rich** (C) | **0.95871** | +0.0048 | + neighbour feature means, structure counts, fold-averaged test scores |
+| nbr_stack_hl14 (A) | 0.95858 | +0.0047 | + recency weights (half-life 14) in both stages |
+| nbr_stack | 0.95389 | — | round 3 |
+| blend_nbr_hl14 (B) | 0.95328 | −0.0006 | 50/50 rank average with halflife_14 (no graph) |
+| halflife_14 | 0.95066 | −0.0032 | round 3 |
+| tuned_lgbm_all | 0.94417 | −0.0097 | round 2 |
+
+Leader 0.96849; gap now 0.0098 (from 0.0243 before round 3). Grade proxy
+10 × (0.95871/0.96849)^5 = **9.50** (8.81 → 9.27 → 9.50).
+
+**Implications.**
+1. **Both extensions improve on nbr_stack by about the same amount (+0.0047 / +0.0048).** Each is
+   at the edge of the ~0.005 noise band on its own. Two independent changes both landing about
+   +0.005 is stronger evidence than either alone. Because each was tested separately against the
+   same reference, their combination (recency + rich context) is the natural next candidate.
+2. **Recency weighting has now helped twice:** +0.0065 on the plain model (round 3) and +0.0047
+   on the stacked model. It is a robust driver, not a one-off.
+3. **Blending the graph model with a non-graph model hurts slightly** (B 0.95328 < nbr_stack
+   0.95389). The non-graph model adds no information the stack lacks and dilutes the neighbour
+   signal. Model diversity without new information does not help here; the same lesson as the
+   cross-family ensembles (§8) and temporal bagging (§14).
+4. **Local validation still cannot rank these.** Every stacked variant failed the local rule,
+   and B, C and A scored nearly equal on the short windows. The public LB remains the arbiter;
+   the 70% private LB is the residual risk.
+
+### 17.1 What makes the stacked model stronger (1-seed diagnostic of nbr_stack_rich)
+
+Mean |SHAP| share by feature group, training rows vs test rows:
+
+| Group | Train | Test |
+|---|---|---|
+| neighbour stage-1 scores (mean, max, in-mean, out-mean) | 0.059 | 0.046 |
+| neighbour feature means (feat_53/59/61/5/3 over labeled neighbours) | 0.065 | **0.071** |
+| structure (in/out degree, labeled-neighbour count and share) | 0.009 | 0.009 |
+| **graph-derived total** | 0.133 | **0.126** |
+
+- In nbr_stack (round 3), the neighbour scores took 22.5% of training gain but only 7.0% of
+  test SHAP. In the rich model, the graph-derived features carry the **same share on train and
+  test** (13.3% vs 12.6%), so the model uses graph context on the test period as it learned to.
+- The **neighbour feature means hold up best on test**: `nbr_mean_feat_59` (the average of
+  feat_59 over a transaction's labeled neighbours) is the **3rd most important feature on test
+  rows**, behind only feat_53 and feat_125. Unlike neighbour *scores*, these need no stage-1
+  model, so the stage-1 model cannot carry its train/test shift into them.
+- Score alignment barely changed levels: the mean test stage-1 score is 0.0884 (fold-average)
+  vs 0.0877 (full model). Training out-of-fold scores average 0.142, consistent with a lower
+  illicit share in the test period. The gain in C therefore comes from the new neighbour
+  context, not from the alignment.
+- Structure counts contribute little (0.9%).
+
+**Interpretation for the report.** The supplied aggregated features summarise each
+transaction's *whole* neighbourhood, and they drift strongly into the test period (§6). The
+self-built aggregates summarise only *labeled* neighbours, a neighbourhood defined identically
+in training and test, and they carry their weight into the test period. The design principle
+that made graph information usable: **define every graph feature so that it is computed the
+same way at training and prediction time.**
+
+### 17.2 Current best model — `nbr_stack_rich` (specification)
+
+As nbr_stack (§14.1), with these changes:
+- **Test-row stage-1 scores:** mean of the five out-of-fold stage-1 models (instead of one model
+  fitted on all rows).
+- **Extra stage-2 features (8 more, 177 total):**
+  - in_degree and out_degree (full edge list);
+  - number of labeled neighbours, and that number divided by total degree;
+  - neighbour means of feat_53, feat_59, feat_61, feat_5, feat_3 over labeled neighbours.
+- **Settings:** LightGBM settings, seeds (10) and training rows unchanged. No recency weights.
+- **Command:** `python -m src.run_step8_variants submit nbr_stack_rich`.
+
+**Final picks as of today:** nbr_stack_rich (0.95871) + nbr_stack_hl14 (0.95858). Their test
+rank correlation is 0.983, the most different pair among the top models.
+
+## 18. Proposed next steps toward 0.96+ (2026-10-13)
+
+| # | Idea | Rationale | Cost |
+|---|---|---|---|
+| 1 | **Combine A + C: `nbr_stack_rich_hl14`** (rich context + half-life-14 weights in both stages) | Two independent ~+0.005 gains, each tested separately against the same reference | low |
+| 2 | **Wider neighbour feature context**: neighbour mean/max/std of the top 20–30 features by test SHAP (not just 5), split into incoming vs outgoing neighbours | Neighbour feature means are the best-transferring graph signal (17.1); only 5 features were used | low |
+| 3 | **Two-hop and iterated context**: labeled neighbours-of-neighbours (scores and feature means), then a second stacking round using stage-2 scores (collective classification; Lu & Getoor 2003) | Laundering moves funds through chains; one hop only sees the immediate step | medium |
+| 4 | **Half-life sweep (7, 10, 21) on the best stack** | 14 was never tuned; 7 was best on the Kaggle-aligned windows locally | low |
+| 5 | **Own stage-1 score as a stage-2 feature, and 20 seeds** | Standard stacking addition; more seeds reduce variance, which matters at ±0.005 margins | low |
+
+Not recommended: rank blends with non-graph models (B, §17), aggregated-only models, further
+hyperparameter search, GraphSAGE and pseudo-labeling.
+
+**Suggested schedule:** day 5 → #1, #2 (on top of #1), #3-lite (two-hop means on top of #1); day 6
+→ #4 and #5 on the day-5 winner, plus one slot held in reserve.
+
+**Deliverables (needed regardless of further gains):** port the winning stack into
+`src/final_config.py` / `src/train.py` and rebuild `e1304439.ipynb`, so the notebook reproduces
+the best submission. The notebook currently reproduces tuned_lgbm_all (0.94417).

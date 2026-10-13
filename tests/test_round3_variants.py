@@ -35,3 +35,27 @@ def test_recent_steps_and_stacking_return_one_score_per_target_row():
 
     assert recent.shape == stacked.shape == (len(target),)
     assert np.all((stacked >= 0) & (stacked <= 1))
+
+
+def test_round4_stack_variants_return_one_score_per_target_row():
+    from src.run_step8_variants import RICH_NEIGHBOUR_FEATURES, make_neighbour_stack, neighbour_context_features
+
+    columns = ["feat_1", "feat_2", *RICH_NEIGHBOUR_FEATURES]
+    train = _frame(np.repeat(np.arange(1, 11), 30), 0)
+    target = _frame(np.repeat([11, 12], 20), 1)
+    for frame in (train, target):
+        for column in RICH_NEIGHBOUR_FEATURES:
+            frame[column] = np.arange(len(frame), dtype=float)
+    edges = pd.DataFrame({"txId1": [*train["txId"].iloc[:-1], "ghost"], "txId2": [*train["txId"].iloc[1:], train["txId"].iloc[0]]})
+    graph = build_graph(edges)
+
+    context = neighbour_context_features(graph, pd.concat([train, target], ignore_index=True))
+    first = train["txId"].iloc[0]
+    assert context.loc[first, "in_degree"] == 1  # the edge from "ghost" counts toward degree
+    assert context.loc[first, "n_labeled_nbrs"] == 1  # ...but "ghost" is not a labeled neighbour
+    assert context.loc[first, "frac_labeled_nbrs"] == pytest.approx(0.5)
+
+    for variant in (make_neighbour_stack(half_life_steps=14), make_neighbour_stack(rich=True)):
+        scores = variant(train, target, columns, 0, graph)
+        assert scores.shape == (len(target),)
+        assert np.all((scores >= 0) & (scores <= 1))
