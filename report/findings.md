@@ -838,3 +838,49 @@ hyperparameter search, GraphSAGE and pseudo-labeling.
 **Deliverables (needed regardless of further gains):** port the winning stack into
 `src/final_config.py` / `src/train.py` and rebuild `e1304439.ipynb`, so the notebook reproduces
 the best submission. The notebook currently reproduces tuned_lgbm_all (0.94417).
+
+## 19. Round 5 variants (2026-10-13)
+
+**Code:** `src/run_step8_variants.py` (`neighbour_wide_features`, `two_hop_features`, new
+registry entries); tests in `tests/test_round3_variants.py` (37 tests pass); outputs
+`artifacts/round5.log`, `artifacts/round3/round5_*.csv`.
+
+All three build on idea #1 from §18, combining the two round-4 gains:
+- **#1 `nbr_stack_rich_hl14`:** nbr_stack_rich + half-life-14 recency weights in all stage-1,
+  out-of-fold and stage-2 fits.
+- **#2 `nbr_stack_wide_hl14`:** #1, with the 5 neighbour feature means replaced by
+  mean/max/std/in-mean/out-mean over labeled neighbours of the **25** supplied features with
+  the highest test |SHAP| in tuned_lgbm_all. They are listed in `WIDE_NEIGHBOUR_FEATURES`
+  (17 local, 8 aggregated, 65% of that model's contribution), giving 125 extra columns. The
+  ranking used test features only, never labels.
+- **#3 `nbr_stack_rich_2hop_hl14`:** #1, plus walk-weighted means over labeled nodes exactly
+  two steps away: A(Ax) minus the walk back to the node itself. Paths may pass through any
+  node, including featureless ones, because the edge list is complete in both periods. Means
+  are taken of the stage-1 score and of the 5 rich features, plus the two-hop labeled walk
+  count.
+
+Local sanity check (2 seeds):
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean |
+|---|---|---|---|---|---|---|
+| tuned_lgbm_all (0.94417) | 0.8991 | 0.9587 | 0.9117 | 0.9953 | 0.9960 | 0.9522 |
+| nbr_stack_rich (0.95871) | 0.8940 | 0.9486 | 0.8878 | 0.9961 | 0.9978 | 0.9449 |
+| **#1 rich_hl14** | 0.8938 | 0.9485 | 0.8908 | **0.9971** | 0.9981 | 0.9457 |
+| #2 wide_hl14 | 0.8883 | 0.9388 | 0.8696 | 0.9969 | 0.9980 | 0.9383 |
+| #3 rich_2hop_hl14 | 0.8927 | 0.9432 | 0.8745 | 0.9969 | **0.9983** | 0.9411 |
+
+The pattern is consistent: more graph context means higher Kaggle-aligned short-window scores
+and lower long-window scores. Wide and two-hop context lose most on the long windows, so they
+are the riskiest of the three. Since nbr_stack showed this same pattern before gaining +0.0097
+on Kaggle, only Kaggle can rank them.
+
+Test rank correlation with nbr_stack_rich: #1 0.990, #2 0.977, #3 0.971 (#3 is the most
+different model so far).
+
+**Kaggle round 5 queue:**
+
+| File | Purpose | Public AUC |
+|---|---|---|
+| `submission_nbr_stack_rich_hl14.csv` | #1 — rich context + recency | _pending_ |
+| `submission_nbr_stack_wide_hl14.csv` | #2 — 25-feature neighbour context | _pending_ |
+| `submission_nbr_stack_rich_2hop_hl14.csv` | #3 — two-hop context | _pending_ |

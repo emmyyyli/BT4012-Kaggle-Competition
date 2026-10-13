@@ -7,6 +7,8 @@ and is then judged on the Kaggle public leaderboard. Variants:
 ``recent_K``      train only on the last K labeled time steps before the cut-off
 ``halflife_H``    exponential recency weights with half-life H steps (mean-one weights)
 ``temporal_bag``  rank-average of models trained on all steps, the last 25 and the last 15
+``nbr_stack_rich_hl14`` / ``nbr_stack_wide_hl14`` / ``nbr_stack_rich_2hop_hl14``
+                  round-5: rich + recency; wide 25-feature neighbour context; two-hop context
 ``nbr_stack_hl14`` / ``nbr_stack_rich``
                   round-4 extensions of nbr_stack: recency weights (half-life 14) in both
                   stages; richer neighbour context with fold-averaged target scores
@@ -28,6 +30,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import scipy.sparse as sp
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -106,7 +109,7 @@ def _recency_weights(times, reference_step, steps):
     return weights / weights.mean()
 
 
-def neighbour_context_features(graph, frame):
+def neighbour_context_features(graph, frame, mean_features=RICH_NEIGHBOUR_FEATURES):
     """Structure and labeled-neighbour feature means for the rows of ``frame``.
 
     Degrees count every edge in the edge list (complete for train and test). Neighbour counts
@@ -116,10 +119,10 @@ def neighbour_context_features(graph, frame):
     ids = frame["txId"]
     degree = graph.groupby(["u", "direction"]).size().unstack(fill_value=0).reindex(ids).fillna(0)
     linked = graph.loc[graph["u"].isin(ids) & graph["v"].isin(ids)]
-    lookup = frame.set_index("txId")[RICH_NEIGHBOUR_FEATURES]
+    lookup = frame.set_index("txId")[list(mean_features)]
     values = lookup.loc[linked["v"]].set_axis(linked.index)
     values["u"] = linked["u"]
-    means = values.groupby("u")[RICH_NEIGHBOUR_FEATURES].mean().add_prefix("nbr_mean_")
+    means = values.groupby("u")[list(mean_features)].mean().add_prefix("nbr_mean_")
     features = pd.DataFrame(index=ids)
     features["in_degree"] = degree.get("in", 0)
     features["out_degree"] = degree.get("out", 0)
@@ -129,13 +132,89 @@ def neighbour_context_features(graph, frame):
     return features.join(means)
 
 
-def make_neighbour_stack(half_life_steps=None, rich=False):
+# Top 25 supplied features by mean |TreeSHAP| on test rows of tuned_lgbm_all (3 seeds, fitted on
+# all labeled rows; test features only, no labels). They carry 65% of that model's contribution.
+WIDE_NEIGHBOUR_FEATURES = [
+    "feat_53", "feat_59", "feat_125", "feat_61", "feat_5", "feat_3", "feat_161", "feat_132", "feat_16",
+    "feat_90", "feat_58", "feat_131", "feat_106", "feat_76", "feat_8", "feat_2", "feat_55", "feat_163",
+    "feat_65", "feat_138", "feat_47", "feat_23", "feat_67", "feat_52", "feat_136",
+]
+
+
+def neighbour_wide_features(graph, frame, features=WIDE_NEIGHBOUR_FEATURES):
+    """Mean, max and std over all labeled neighbours, plus incoming and outgoing means."""
+    ids = frame["txId"]
+    linked = graph.loc[graph["u"].isin(ids) & graph["v"].isin(ids)]
+    values = frame.set_index("txId")[list(features)].loc[linked["v"]].set_axis(linked.index)
+    values["u"] = linked["u"].to_numpy()
+    values["direction"] = linked["direction"].to_numpy()
+    grouped = values.groupby("u")[list(features)]
+    parts = [grouped.mean().add_prefix("nbrw_mean_"), grouped.max().add_prefix("nbrw_max_"), grouped.std().add_prefix("nbrw_std_")]
+    for direction in ("in", "out"):
+        subset = values.loc[values["direction"] == direction]
+        parts.append(subset.groupby("u")[list(features)].mean().add_prefix(f"nbrw_{direction}_mean_"))
+    return pd.concat(parts, axis=1).reindex(ids)
+
+
+_ADJACENCY_CACHE = {}
+
+
+def _undirected_adjacency(graph):
+    """Binary undirected adjacency over every node in the edge list (cached per graph)."""
+    key = id(graph)
+    if key not in _ADJACENCY_CACHE:
+        nodes = pd.Index(pd.unique(graph["u"]))
+        rows = nodes.get_indexer(graph["u"])
+        cols = nodes.get_indexer(graph["v"])
+        matrix = sp.csr_matrix((np.ones(len(rows)), (rows, cols)), shape=(len(nodes), len(nodes)))
+        matrix.data[:] = 1.0  # collapse duplicate edges
+        _ADJACENCY_CACHE[key] = (nodes, matrix)
+    return _ADJACENCY_CACHE[key]
+
+
+def two_hop_features(graph, frame, scores, mean_features=RICH_NEIGHBOUR_FEATURES):
+    """Walk-weighted means over labeled nodes two steps away (paths may pass through any node).
+
+    Uses A(Ax) minus the walk back to the node itself, so a node never counts as its own
+    two-hop neighbour. Only nodes in ``frame`` (labeled training rows plus target rows) are
+    endpoints, the same rule as the one-hop features.
+    """
+    nodes, adjacency = _undirected_adjacency(graph)
+    degree = np.asarray(adjacency.sum(axis=1)).ravel()
+    position = nodes.get_indexer(frame["txId"])
+    present = position >= 0
+    mask = np.zeros(len(nodes))
+    mask[position[present]] = 1.0
+
+    def walk_sum(values):
+        return adjacency @ (adjacency @ values) - degree * values
+
+    counts = walk_sum(mask)
+    out = pd.DataFrame(index=frame["txId"])
+    out["hop2_labeled_walks"] = np.where(present, counts[np.clip(position, 0, None)], 0.0)
+    columns = {"hop2_score_mean": scores.reindex(frame["txId"]).to_numpy()}
+    for feature in mean_features:
+        columns[f"hop2_mean_{feature}"] = frame[feature].to_numpy()
+    for name, values in columns.items():
+        vector = np.zeros(len(nodes))
+        vector[position[present]] = values[present]
+        sums = walk_sum(vector)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            mean = np.where(counts > 0, sums / counts, np.nan)
+        out[name] = np.where(present, mean[np.clip(position, 0, None)], np.nan)
+    return out
+
+
+def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=False):
     """Two-stage stacking over labeled neighbours.
 
     ``half_life_steps``: recency weights in both stages (relative to the last training step).
     ``rich``: add structure + neighbour feature means, and score target rows with the mean of
     the out-of-fold models so that training and target neighbour scores come from the same
     kind of model (instead of a separate model fitted on all training rows).
+    ``wide``: replace the 5 rich neighbour means with mean/max/std/in-mean/out-mean of the 25
+    WIDE_NEIGHBOUR_FEATURES over labeled neighbours (requires ``rich``).
+    ``two_hop``: add walk-weighted two-hop means of stage-1 scores and the rich features.
     """
     def fit(frame, columns, seed, reference_step):
         weights = None if half_life_steps is None else _recency_weights(frame["time_step"], reference_step, half_life_steps)
@@ -160,8 +239,13 @@ def make_neighbour_stack(half_life_steps=None, rich=False):
         scores = pd.concat([pd.Series(oof, index=train["txId"]), pd.Series(target_scores, index=target["txId"])])
         neighbour = neighbour_score_features(graph, scores)
         if rich:
-            context = neighbour_context_features(graph, pd.concat([train, target], ignore_index=True))
+            both = pd.concat([train, target], ignore_index=True)
+            context = neighbour_context_features(graph, both, mean_features=[] if wide else RICH_NEIGHBOUR_FEATURES)
             neighbour = neighbour.join(context)
+            if wide:
+                neighbour = neighbour.join(neighbour_wide_features(graph, both))
+            if two_hop:
+                neighbour = neighbour.join(two_hop_features(graph, both, scores))
         stacked_columns = [*columns, *neighbour.columns]
         train_x = pd.concat([train[columns], neighbour.loc[train["txId"]].reset_index(drop=True)], axis=1)
         target_x = pd.concat([target[columns], neighbour.loc[target["txId"]].reset_index(drop=True)], axis=1)
@@ -184,6 +268,9 @@ def variants():
     registry["nbr_stack"] = neighbour_stack
     registry["nbr_stack_hl14"] = make_neighbour_stack(half_life_steps=14)
     registry["nbr_stack_rich"] = make_neighbour_stack(rich=True)
+    registry["nbr_stack_rich_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True)
+    registry["nbr_stack_wide_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, wide=True)
+    registry["nbr_stack_rich_2hop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True)
     return registry
 
 
@@ -237,6 +324,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["evaluate", "submit", "blend"])
     parser.add_argument("names", nargs="*")
+    parser.add_argument("--prefix", default=None, help="output table prefix for evaluate (default round3/round4)")
     args = parser.parse_args()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     train, test, edges, sample_submission = load_data()
@@ -246,7 +334,7 @@ def main():
     if args.command == "blend":  # blend OUTPUT_NAME NAME1 NAME2 ...
         blend_files(args.names[0], args.names[1:], sample_submission)
     elif args.command == "evaluate":
-        evaluate(labeled, columns, graph, args.names, prefix="round4" if args.names else "round3")
+        evaluate(labeled, columns, graph, args.names, prefix=args.prefix or ("round4" if args.names else "round3"))
     else:
         submit(labeled, test, columns, graph, args.names, sample_submission)
 

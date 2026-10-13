@@ -59,3 +59,35 @@ def test_round4_stack_variants_return_one_score_per_target_row():
         scores = variant(train, target, columns, 0, graph)
         assert scores.shape == (len(target),)
         assert np.all((scores >= 0) & (scores <= 1))
+
+
+def test_two_hop_features_reach_through_unlabeled_nodes_but_not_back_to_self():
+    from src.run_step8_variants import two_hop_features
+
+    # a - x - c - d : x is unlabeled (not in frame); a's two-hop labeled node is c only.
+    edges = pd.DataFrame({"txId1": ["a", "x", "c"], "txId2": ["x", "c", "d"]})
+    frame = pd.DataFrame({"txId": ["a", "c", "d"], "feat_1": [1.0, 3.0, 5.0]})
+    scores = pd.Series({"a": 0.1, "c": 0.7, "d": 0.9})
+    out = two_hop_features(build_graph(edges), frame, scores, mean_features=["feat_1"])
+
+    assert out.loc["a", "hop2_labeled_walks"] == 1
+    assert out.loc["a", "hop2_score_mean"] == pytest.approx(0.7)
+    assert out.loc["a", "hop2_mean_feat_1"] == pytest.approx(3.0)
+    assert out.loc["c", "hop2_labeled_walks"] == 1  # c -> x -> a (c -> d -> c is excluded)
+    assert out.loc["c", "hop2_score_mean"] == pytest.approx(0.1)
+    assert out.loc["d", "hop2_labeled_walks"] == 0  # d -> c -> x reaches only an unlabeled node
+    assert np.isnan(out.loc["d", "hop2_score_mean"])
+
+
+def test_wide_features_cover_stats_and_directions():
+    from src.run_step8_variants import neighbour_wide_features
+
+    edges = pd.DataFrame({"txId1": ["a", "b"], "txId2": ["c", "c"]})
+    frame = pd.DataFrame({"txId": ["a", "b", "c"], "feat_9": [1.0, 3.0, 10.0]})
+    out = neighbour_wide_features(build_graph(edges), frame, features=["feat_9"])
+
+    assert out.loc["c", "nbrw_mean_feat_9"] == pytest.approx(2.0)
+    assert out.loc["c", "nbrw_max_feat_9"] == pytest.approx(3.0)
+    assert out.loc["c", "nbrw_in_mean_feat_9"] == pytest.approx(2.0)
+    assert np.isnan(out.loc["c", "nbrw_out_mean_feat_9"])
+    assert out.loc["a", "nbrw_out_mean_feat_9"] == pytest.approx(10.0)
