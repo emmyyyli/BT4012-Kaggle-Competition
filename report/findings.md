@@ -881,6 +881,99 @@ different model so far).
 
 | File | Purpose | Public AUC |
 |---|---|---|
-| `submission_nbr_stack_rich_hl14.csv` | #1 — rich context + recency | _pending_ |
-| `submission_nbr_stack_wide_hl14.csv` | #2 — 25-feature neighbour context | _pending_ |
-| `submission_nbr_stack_rich_2hop_hl14.csv` | #3 — two-hop context | _pending_ |
+| `submission_nbr_stack_rich_hl14.csv` | #1 — rich context + recency | **0.96342** (2026-10-15) |
+| `submission_nbr_stack_wide_hl14.csv` | #2 — 25-feature neighbour context | **0.96506** (2026-10-15) |
+| `submission_nbr_stack_rich_2hop_hl14.csv` | #3 — two-hop context | **0.96668** (2026-10-15) |
+
+## 20. Kaggle round 5 (2026-10-15) — two-hop context reaches the leader's range
+
+| Submission | Public ROC-AUC | Δ vs previous step | Rank ρ with nbr_stack_rich |
+|---|---|---|---|
+| **nbr_stack_rich_2hop_hl14** | **0.96668** | +0.0033 vs rich_hl14 | 0.971 |
+| nbr_stack_wide_hl14 | 0.96506 | +0.0016 vs rich_hl14 | 0.977 |
+| nbr_stack_rich_hl14 | 0.96342 | +0.0047 vs nbr_stack_rich, +0.0048 vs nbr_stack_hl14 | 0.990 |
+| nbr_stack_rich | 0.95871 | round 4 | — |
+
+Leader at the time: 0.96849. The gap is now 0.0018, which is within the noise of a single
+leaderboard score. Grade proxy 10 × (0.96668/0.96849)^5 = **9.91**.
+
+**Progression of the best public score:** original 0.94246 → tuned_lgbm_all 0.94417 →
+nbr_stack 0.95389 → nbr_stack_rich 0.95871 → nbr_stack_rich_hl14 0.96342 →
+nbr_stack_rich_2hop_hl14 **0.96668**. That is +0.0242 in total, of which +0.0225 came after
+graph context was introduced.
+
+### 20.1 What drives the predictions
+
+1. **The two drivers add up.** rich + recency (0.96342) improves on rich alone by +0.0047 and on
+   recency-stack alone by +0.0048, close to the sum of their separate gains. Graph context and
+   temporal recency act on independent sources of error.
+2. **Two-hop context is the largest single step this round (+0.0033), and it matters more on
+   test than on training data.** Coverage of rows by labeled context:
+
+   | Rows | 1-hop labeled neighbour | 2-hop labeled node | either | 2-hop only (no 1-hop) | neither |
+   |---|---|---|---|---|---|
+   | labeled training | 78.2% | 87.8% | 92.5% | 14.3% | 7.5% |
+   | test | 74.6% | **93.8%** | **96.4%** | **21.8%** | 3.6% |
+
+   In the test period, 65.6% of a transaction's direct neighbours are featureless unlabeled
+   nodes (§1.3). Two-hop walks pass *through* those blank nodes (the edge list is complete) to
+   reach labeled transactions beyond them. That gives context to more than a fifth of test rows
+   that had none at one hop, and leaves only 3.6% of test rows with no graph context at all.
+   The benefit is larger in test than in training, which also explains why local windows
+   underrated it.
+3. **Wider one-hop statistics help less** (+0.0016, ~1 paired SE; see 20.2). After five feature
+   means, the one-hop neighbourhood is largely captured; *reach* matters more than *detail*.
+4. **Every gain since round 3 came from information the model could not see before:**
+   neighbours, neighbourhood features, then neighbours-of-neighbours. Ideas that only reshaped
+   existing information did not help: tuning beyond regularisation, cross-family ensembles,
+   blends with non-graph models, drift dropping.
+
+### 20.2 Public (30%) vs private (70%) leaderboard
+
+The test set has about 901 illicit transactions (Elliptic total 4,545 − 3,644 in training)
+among 15,329.
+- Public LB ≈ 270 illicit / 4,330 licit; private ≈ 631 / 10,100.
+- Hanley–McNeil standard error of an AUC near 0.966: **public ≈ 0.0077**, private ≈ 0.0051.
+
+Implications:
+- **One model's public and private scores can differ by about ±0.009 (1 SD).** Our 0.96668 and
+  the leader's 0.96849 are statistically tied, and the private ranking among the top entries
+  can reshuffle.
+- **Differences between our own closely related models are measured far more precisely than
+  their absolute level,** because the same public rows score both. With AUC-estimate
+  correlation 0.97–0.99, the paired SE of a difference is about **0.001–0.002**. So:
+  2hop vs rich_hl14 (+0.0033) ≈ 2 SE; rich_hl14 vs rich (+0.0047) ≈ 3 SE; nbr_stack vs
+  tuned_lgbm_all (+0.0097) ≥ 4 SE; wide vs rich_hl14 (+0.0016) ≈ 1 SE, inconclusive. (This is
+  tighter than the ±0.005 rule of thumb used earlier, which applied to unrelated models.)
+- **Selection bias is limited but real.** About 17 public submissions have been made, and picking
+  the best of them biases its public score slightly upward. Two things limit this: each step
+  tested a stated hypothesis against a fixed reference, and the gains form a consistent
+  mechanism (graph context, recency) confirmed several times. Small "wins" chosen only on the
+  public LB are the main overfitting risk from here, so **require ≥ +0.003 (about 2 paired SE)
+  before switching the primary model.**
+- **For the two private picks, prefer *different* models that are each well supported** over
+  two near-duplicates. The private LB rewards a model that is good on average, not one tuned to
+  the public 30%.
+
+## 21. Next steps after round 5 (2026-10-15)
+
+| # | Idea | Rationale | Expected |
+|---|---|---|---|
+| 1 | **wide + two-hop + recency** (`nbr_stack_wide_2hop_hl14`) | Combines the two best round-5 additions; they act on different axes (detail vs reach) | small +; one slot |
+| 2 | **Longer reach**: three-hop walk means, or label-free score propagation over the full graph (personalized-PageRank-style smoothing of stage-1 scores, passing through blank nodes) | Reach was the strongest effect; 3.6% of test rows still have no labeled context within 2 hops | medium + |
+| 3 | **Two-hop of the wide statistics** (max/std as well as mean) | Two-hop currently uses only 5 feature means and the score | small + |
+| 4 | **Variance-reduced finalists**: 20 seeds, and a rank blend of the top graph models (2hop + wide + rich_hl14) | Blending *graph* models does not dilute graph signal the way blending with non-graph models did (§17); it lowers private-LB variance | private robustness |
+| 5 | **Half-life sweep (7, 10, 21) on the best stack** | 14 was never tuned | small ± |
+
+**Deliverables (deadline 24 Oct, report 25 Oct):** port the final stack into
+`src/final_config.py` / `src/train.py` and rebuild `e1304439.ipynb`, so the notebook reproduces
+the chosen submission. It currently reproduces tuned_lgbm_all (0.94417). Do this before more
+exploration so the code deliverable is safe.
+
+**Final picks as of today:**
+- **Primary:** nbr_stack_rich_2hop_hl14 (0.96668).
+- **Secondary:** nbr_stack_rich_hl14 (0.96342). It is the simplest model carrying both
+  confirmed drivers, and it ranks the test set most differently from the primary among the
+  strong candidates (ρ 0.977).
+- **Revisit after #1 and #4:** if a rank blend of the top graph models scores within ~0.002 of
+  the best single model, it is the better second pick for the private LB.
