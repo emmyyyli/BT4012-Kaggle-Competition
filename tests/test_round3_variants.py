@@ -91,3 +91,18 @@ def test_wide_features_cover_stats_and_directions():
     assert out.loc["c", "nbrw_in_mean_feat_9"] == pytest.approx(2.0)
     assert np.isnan(out.loc["c", "nbrw_out_mean_feat_9"])
     assert out.loc["a", "nbrw_out_mean_feat_9"] == pytest.approx(10.0)
+
+
+def test_propagation_passes_through_featureless_nodes_with_decay():
+    from src.graph_stacking import propagation_features
+
+    # a - x - c : x has no features (not in frame). One hop from a reaches only x (no mass);
+    # two hops reach a (itself) and c with equal probability.
+    edges = pd.DataFrame({"txId1": ["a", "x"], "txId2": ["x", "c"]})
+    frame = pd.DataFrame({"txId": ["a", "c"]})
+    scores = pd.Series({"a": 0.2, "c": 0.8})
+    out = propagation_features(build_graph(edges), frame, scores, hops=2, decay=0.5)
+
+    # hop1: P m at a = 0 ; hop2: P^2 m at a = 1 (half to a, half to c), weighted by 0.5
+    assert out.loc["a", "prop_reach"] == pytest.approx(0.5)
+    assert out.loc["a", "prop_score"] == pytest.approx(0.5)  # (0.5*0.2 + 0.5*0.8) / 1

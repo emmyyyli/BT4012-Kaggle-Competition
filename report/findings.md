@@ -977,3 +977,56 @@ exploration so the code deliverable is safe.
   strong candidates (ρ 0.977).
 - **Revisit after #1 and #4:** if a rank blend of the top graph models scores within ~0.002 of
   the best single model, it is the better second pick for the private LB.
+
+## 22. Final pipeline ported; round 6 variants (2026-10-15)
+
+**Deliverable now reproduces the best submission.**
+- Stacking code moved into `src/graph_stacking.py` (library module, unit-tested). The tuned
+  LightGBM settings moved into `src/model_zoo.py`.
+- `src/final_config.py`: `FINAL_STACK = {half_life_steps: 14, rich: True, two_hop: True}`
+  (nbr_stack_rich_2hop_hl14), with `SECOND_PICK_STACK` (nbr_stack_rich_hl14) and the non-graph
+  reference documented.
+- `src/train.py` validates the stack against the non-graph reference, runs 10 seeds on all
+  labeled rows, and writes `submissions/submission_final.csv` plus
+  `models/final_model_config.json`.
+- `e1304439.ipynb` was rebuilt with a graph-coverage table, the stack description, validation
+  and the final fit. Its `submission_final.csv` is **identical** to the scored
+  `submission_nbr_stack_rich_2hop_hl14.csv` (max abs difference 0.0; 0 notebook errors; 38
+  tests pass).
+- Notebook validation (3 seeds): the stack scores 0.9970 / 0.9983 on the Kaggle-aligned short
+  windows, against 0.9954 / 0.9960 for the non-graph reference. The mean over 5 windows is
+  lower (0.9426 vs 0.9523) because of the long windows (§14 explains why those are not used for
+  selection).
+
+**Round 6 variants** (`src/run_step8_variants.py`; tables `artifacts/round3/round6_*.csv`):
+- **`nbr_stack_wide_2hop_hl14`:** wide 25-feature one-hop statistics plus two-hop context
+  (combines the two best round-5 additions).
+- **`nbr_stack_rich_2hop_prop_hl14`:** two-hop + **3-hop label-free score propagation**
+  (`propagation_features`). This is a random-walk-weighted mean of stage-1 scores over labeled
+  nodes up to 3 steps away (decay 0.5 per hop), with walks passing through featureless nodes,
+  plus the walk mass reached.
+- **`blend_top_graph`:** equal rank average of the three best graph models: 2hop (0.96668),
+  wide (0.96506) and rich_hl14 (0.96342). It is a variance-reduction candidate for the
+  private LB.
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean |
+|---|---|---|---|---|---|---|
+| tuned_lgbm_all (non-graph) | 0.8991 | 0.9587 | 0.9117 | 0.9953 | 0.9960 | 0.9522 |
+| nbr_stack_rich_2hop_hl14 (0.96668) | 0.8927 | 0.9432 | 0.8745 | 0.9969 | 0.9983 | 0.9411 |
+| **2hop + propagation** | 0.8853 | **0.9463** | **0.8850** | 0.9963 | **0.9985** | **0.9423** |
+| wide + 2hop | 0.8798 | 0.9359 | 0.8620 | **0.9970** | 0.9982 | 0.9346 |
+
+The 2hop row reproduces round 5 exactly, so the refactor preserved behaviour. Propagation is
+the first graph extension that does *not* lose more on the long windows than its parent: it
+gains about +0.01 on ≤21→22–35 while holding the short windows.
+
+Test rank correlations with the current best (2hop): propagation 0.972 (the most different),
+wide+2hop 0.984, blend 0.989.
+
+**Kaggle round 6 queue:**
+
+| File | Purpose | Public AUC |
+|---|---|---|
+| `submission_nbr_stack_rich_2hop_prop_hl14.csv` | longer reach (3-hop propagation) | _pending_ |
+| `submission_nbr_stack_wide_2hop_hl14.csv` | detail + reach combined | _pending_ |
+| `submission_blend_top_graph.csv` | variance-reduced blend for the private LB | _pending_ |

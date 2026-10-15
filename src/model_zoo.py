@@ -37,6 +37,18 @@ SHALLOW_LGBM_PARAMS = dict(
     reg_lambda=5.0,
 )
 
+# Tuned LightGBM settings (Optuna, short-horizon tuning windows; report/findings.md section 8).
+TUNED_LGBM_PARAMS = dict(
+    n_estimators=500,
+    learning_rate=0.0252683175248254,
+    num_leaves=9,
+    min_child_samples=49,
+    colsample_bytree=0.644456547178642,
+    subsample=0.9826426262765469,
+    subsample_freq=1,
+    reg_lambda=2.035593509388961,
+)
+
 DEFAULT_XGB_PARAMS = dict(
     n_estimators=600,
     learning_rate=0.03,

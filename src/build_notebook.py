@@ -40,8 +40,14 @@ experiments that led to these choices are run by the scripts in `src/` and recor
   extrapolate a raw time counter into the unseen test steps 36-49.
 * Validation always trains on earlier steps and scores later steps, over several windows and
   random seeds, because single-seed, single-split scores varied by up to 0.02 ROC-AUC.
-* The final model is a regularised gradient-boosted tree model on the supplied features; the
-  configuration lives in `src/final_config.py`.
+* Labeled transactions cluster: 57% of an illicit transaction's labeled neighbours are illicit
+  (base rate 12%). The final model adds graph context with a two-stage stack: stage-1 scores
+  and features of *labeled* neighbours (one and two hops away) become features for stage 2.
+  Context is restricted to labeled nodes because those are the only transactions with features
+  in the test period, so every graph feature is computed the same way in training and test.
+* Training rows are weighted toward recent steps (half-life 14 steps).
+* Both stages use a tuned, shallow LightGBM; the configuration is in `src/final_config.py`
+  (Kaggle public ROC-AUC 0.96668).
 """),
     code("""
 from pathlib import Path
@@ -56,8 +62,9 @@ import pandas as pd
 from src.data import load_data
 from src.evaluation import REPORT_WINDOWS, labeled_frame, window_table
 from src.features import get_feature_groups
-from src.final_config import FINAL_MEMBERS, FINAL_NAME, FINAL_SEEDS
+from src.final_config import FINAL_NAME, FINAL_SEEDS, FINAL_STACK
 from src.graph import audit_graph_coverage
+from src.graph_stacking import build_graph, two_hop_features
 from src import train as final_pipeline
 
 pd.set_option("display.width", 160)
@@ -104,10 +111,28 @@ pd.Series(audit)
 """),
     md("""
 Two-thirds of a test transaction's neighbours have no features, while every training
-transaction's neighbours do. A graph neural network that reads neighbour features therefore
-meets a different input distribution at test time; this is why the graph models tested were
-not used in the final submission (`report/findings.md`, sections 1.3 and 7).
-
+transaction's neighbours do. A graph neural network that reads all neighbour features
+therefore meets a different input distribution at test time (GraphSAGE lowered the Kaggle
+score; `report/findings.md` sections 1.3 and 7). The final model avoids this by using only
+*labeled* neighbours, which have features in both periods, and by letting two-hop walks pass
+through featureless nodes. Coverage of that context is similar in training and test:
+"""),
+    code("""
+graph = build_graph(edges)
+context_rows = pd.concat([labeled[["txId"]], test[["txId"]]], ignore_index=True)
+scored = set(context_rows["txId"])
+one_hop = graph[graph["u"].isin(scored) & graph["v"].isin(scored)].groupby("u").size()
+dummy = context_rows.assign(**{c: 0.0 for c in ["feat_3", "feat_5", "feat_53", "feat_59", "feat_61"]})
+two_hop = two_hop_features(graph, dummy, pd.Series(0.0, index=context_rows["txId"]))["hop2_labeled_walks"]
+coverage = {}
+for name, frame in [("labeled training rows", labeled), ("test rows", test)]:
+    has_one = one_hop.reindex(frame["txId"]).fillna(0).to_numpy() > 0
+    has_two = two_hop.reindex(frame["txId"]).fillna(0).to_numpy() > 0
+    coverage[name] = {"1-hop labeled neighbour": has_one.mean(), "2-hop labeled node": has_two.mean(),
+                      "2-hop only": (has_two & ~has_one).mean(), "no graph context": (~has_one & ~has_two).mean()}
+pd.DataFrame(coverage).T.round(3)
+"""),
+    md("""
 ## 2. Features and distribution shift
 
 Per the Elliptic documentation, `feat_1`-`feat_93` describe the transaction itself (local) and
@@ -138,22 +163,38 @@ features, so the final model keeps all supplied features and relies on regularis
 than on the aggregated group.
 
 ## 3. Final model configuration
+
+`graph_stacking.make_neighbour_stack(**FINAL_STACK)`:
+1. **Stage 1** — tuned LightGBM on the 165 supplied features scores labeled training rows
+   out-of-fold (5 folds of consecutive time steps) and test rows with the mean of the 5 fold
+   models.
+2. **Graph context** — for every transaction: mean / max / incoming-mean / outgoing-mean of
+   stage-1 scores over labeled neighbours; in/out degree; number and share of labeled
+   neighbours; neighbour means of feat_53, feat_59, feat_61, feat_5, feat_3; and walk-weighted
+   two-hop means of the stage-1 score and those five features.
+3. **Stage 2** — the same LightGBM on supplied features + graph context.
+4. Both stages weight training rows by 2^((t - last step)/14); classes are balanced; seeds
+   0-9 are averaged.
 """),
     code("""
-print("final model:", FINAL_NAME, "| seeds per member:", len(FINAL_SEEDS))
-pd.DataFrame([{k: v for k, v in m.items() if k != "params"} | {"params": m["params"]} for m in FINAL_MEMBERS])
+from src.model_zoo import TUNED_LGBM_PARAMS
+print("final model:", FINAL_NAME, "| stack options:", FINAL_STACK, "| seeds:", len(FINAL_SEEDS))
+pd.Series(TUNED_LGBM_PARAMS, name="LightGBM settings (both stages)")
 """),
     md("""
 ## 4. Time-forward validation
 
 Each window trains on labeled rows up to a step and scores a later block. Three seeds per window
-are averaged (seed bagging, as in the submission). The reference is the original production
-LightGBM (31 leaves, 800 trees, 90% column sampling). The short windows (train <= 25 or <= 28)
-are the ones whose model ranking matched the Kaggle leaderboard.
+are averaged (seed bagging, as in the submission). The reference is the tuned LightGBM without
+graph context (Kaggle 0.94417). The short windows (train <= 25 or <= 28) are the ones whose
+model ranking matched the Kaggle leaderboard; the graph stack wins there but loses on the long
+windows, and the Kaggle leaderboard (+0.0225 over the reference) sided with the short windows.
+Local windows cannot reproduce the test period's drift, so they serve here as a reproducibility
+check rather than as the selection criterion (`report/findings.md` sections 11, 14, 20).
+Runtime: several minutes.
 """),
     code("""
-candidates, weights = final_pipeline.build_members(train.columns)
-tables = final_pipeline.validate(labeled, candidates, weights, seeds=(0, 1, 2), output_dir=PROJECT_ROOT / "artifacts" / "final")
+tables = final_pipeline.validate(labeled, graph, seeds=(0, 1, 2), output_dir=PROJECT_ROOT / "artifacts" / "final")
 window_table(tables["window_metrics"]).round(4)
 """),
     code("""
@@ -162,12 +203,12 @@ tables["summary"].round(4)
     md("""
 ## 5. Final training and submission
 
-Every member is refitted on all 31,235 labeled rows from steps 1-35 with each seed; seed
-predictions are averaged, and members (if several) are rank-averaged with fixed weights. The
-writer enforces the `index,target` format and the sample-submission row order.
+Both stages are refitted on all 31,235 labeled rows from steps 1-35 for each of the ten seeds,
+and the seed predictions for the test rows are averaged. The writer enforces the `index,target`
+format and the sample-submission row order.
 """),
     code("""
-target, fitted = final_pipeline.fit_and_predict(labeled, test, candidates, weights, FINAL_SEEDS)
+target = final_pipeline.stack_predict(labeled, test, graph, FINAL_SEEDS)
 submission = pd.DataFrame({"index": test["index"].to_numpy(), "target": target})
 path = final_pipeline.write_submission(submission, PROJECT_ROOT / "submissions" / "submission_final.csv",
                                        sample_submission=sample_submission)
@@ -187,6 +228,7 @@ for label, relative in [
     ("Step 5 - stress tests", "artifacts/stress/stress_summary.csv"),
     ("Step 6 - GraphSAGE", "artifacts/extensions/gnn_summary.csv"),
     ("Step 6 - pseudo-labeling", "artifacts/extensions/pseudo_summary.csv"),
+    ("Rounds 3-5 - graph stacking variants (local check)", "artifacts/round3/round5_window_table.csv"),
 ]:
     path = PROJECT_ROOT / relative
     if path.exists():

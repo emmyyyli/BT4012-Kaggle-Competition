@@ -1,40 +1,29 @@
 """Version-controlled settings for the final submission model.
 
-Tuning results live in ``artifacts/tuning`` (not tracked), so the selected configuration is
-copied here so that ``python -m src.train`` and ``e1304439.ipynb`` reproduce the submission
-without re-running the search. Every member is fitted on all labeled rows (steps 1-35) with
-each seed in ``FINAL_SEEDS``; the seed-averaged probabilities of each member are then
-rank-averaged with the given weights (a single member is used as-is).
+``python -m src.train`` and ``e1304439.ipynb`` read this file to reproduce the submission
+without re-running any search. Selection evidence: report/findings.md (sections 14-20).
 
-Selection evidence: report/findings.md.
+Final model: two-stage graph stacking (``src/graph_stacking.py``) with tuned LightGBM in both
+stages, half-life-14 recency weights, one-hop labeled-neighbour context ("rich") and two-hop
+context. Kaggle public ROC-AUC 0.96668. Each seed repeats both stages; seed predictions are
+averaged.
 """
 
-from src.model_zoo import SHALLOW_LGBM_PARAMS
+from src.model_zoo import SHALLOW_LGBM_PARAMS, TUNED_LGBM_PARAMS
 
-FINAL_NAME = "tuned_lgbm_all"
+FINAL_NAME = "nbr_stack_rich_2hop_hl14"
 FINAL_SEEDS = tuple(range(10))
 
-# Tuned LightGBM settings (Optuna, short-horizon tuning windows; report/findings.md section 8).
-TUNED_LGBM_PARAMS = dict(
-    n_estimators=500,
-    learning_rate=0.0252683175248254,
-    num_leaves=9,
-    min_child_samples=49,
-    colsample_bytree=0.644456547178642,
-    subsample=0.9826426262765469,
-    subsample_freq=1,
-    reg_lambda=2.035593509388961,
-)
+# Arguments for ``graph_stacking.make_neighbour_stack``.
+FINAL_STACK = {"half_life_steps": 14, "rich": True, "two_hop": True}
 
-# The five features that best separate labeled training rows from Kaggle test rows
-# (adversarial validation, no labels; report/findings.md sections 5.3, 6, 8 and 11).
-# Tested as a variant; not used by the final model.
-TEST_DRIFTED_FEATURES = ["feat_103", "feat_136", "feat_101", "feat_2", "feat_139"]
+# Second private-leaderboard pick (public 0.96342): same pipeline without two-hop context.
+SECOND_PICK_NAME = "nbr_stack_rich_hl14"
+SECOND_PICK_STACK = {"half_life_steps": 14, "rich": True}
 
-# family: lgbm | xgb | catboost; feature_set: all | local | aggregated; drop: columns removed.
-# Kaggle public: tuned_lgbm_all 0.94417, the same model without TEST_DRIFTED_FEATURES 0.94365
-# (within noise), shallow_all 0.94267. The simpler model without drops is used.
-FINAL_MEMBERS = [
+# Non-graph reference used in validation tables: tuned LightGBM on the 165 supplied features
+# (public 0.94417). family: lgbm | xgb | catboost; feature_set: all | local | aggregated.
+REFERENCE_MEMBERS = [
     {
         "name": "tuned_lgbm_all",
         "family": "lgbm",
@@ -45,9 +34,12 @@ FINAL_MEMBERS = [
     },
 ]
 
-# Safe second pick for the private leaderboard (public 0.94267): shallow_all, i.e.
-# feature_set "all", no drops, params SHALLOW_LGBM_PARAMS.
-SAFE_ALTERNATIVE = {
+# The five features that best separate labeled training rows from Kaggle test rows
+# (adversarial validation, no labels; sections 5.3, 6, 8, 11). Tested; not used.
+TEST_DRIFTED_FEATURES = ["feat_103", "feat_136", "feat_101", "feat_2", "feat_139"]
+
+# Earlier regularised baseline (public 0.94267), kept for reference.
+SHALLOW_ALL = {
     "name": "shallow_all",
     "family": "lgbm",
     "feature_set": "all",

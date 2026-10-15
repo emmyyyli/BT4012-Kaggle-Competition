@@ -1,0 +1,22 @@
+nb_exit=0
+final == scored 2hop file: True max abs diff 0.0
+notebook errors: 0
+  t14_v15-35
+  t21_v22-35
+  t21_v22-28
+  t25_v26-35
+  t28_v29-35
+window                         t14_v15-35  t21_v22-28  t21_v22-35  t25_v26-35  t28_v29-35    mean
+candidate                                                                                        
+tuned_lgbm_all                     0.8991      0.9587      0.9117      0.9953      0.9960  0.9522
+nbr_stack_rich_2hop_prop_hl14      0.8853      0.9463      0.8850      0.9963      0.9985  0.9423
+nbr_stack_rich_2hop_hl14           0.8927      0.9432      0.8745      0.9969      0.9983  0.9411
+nbr_stack_wide_2hop_hl14           0.8798      0.9359      0.8620      0.9970      0.9982  0.9346
+                    candidate  mean_roc_auc  worst_roc_auc  mean_delta_vs_baseline  min_window_delta  windows_improved  windows  mean_seed_auc_std  adopt
+               tuned_lgbm_all        0.9522         0.8991                  0.0000            0.0000                 0        5             0.0019  False
+nbr_stack_rich_2hop_prop_hl14        0.9423         0.8850                 -0.0099           -0.0267                 2        5             0.0027  False
+     nbr_stack_rich_2hop_hl14        0.9411         0.8745                 -0.0110           -0.0372                 2        5             0.0030  False
+     nbr_stack_wide_2hop_hl14        0.9346         0.8620                 -0.0176           -0.0498                 2        5             0.0023  False
+Wrote submissions/submission_nbr_stack_wide_2hop_hl14.csv
+Wrote submissions/submission_nbr_stack_rich_2hop_prop_hl14.csv
+Wrote submissions/submission_blend_top_graph.csv

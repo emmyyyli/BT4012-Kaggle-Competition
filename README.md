@@ -1,7 +1,7 @@
 # Bitcoin Transaction Fraud Detection (Elliptic, BT4012 Kaggle)
 
-Gradient-boosted tree models that estimate the probability that a Bitcoin transaction is
-illicit. Only transactions labeled `0` (licit) or `1` (illicit) are used for supervised
+A two-stage graph-stacking model (LightGBM in both stages) that estimates the probability
+that a Bitcoin transaction is illicit. Only transactions labeled `0` (licit) or `1` (illicit) are used for supervised
 training; `none` rows are treated as unlabeled. `time_step` is used only for chronological
 splits, never as a model input.
 
@@ -26,10 +26,22 @@ python -m src.build_notebook         # regenerate and execute e1304439.ipynb (sa
 python -m pytest                     # unit tests
 ```
 
-The final model is defined in [`src/final_config.py`](src/final_config.py): a tuned,
-shallow LightGBM (9 leaves, 500 trees) on all 165 supplied features, averaged over 10 seeds
-(public ROC-AUC 0.94417). A variant without the five most test-drifted features scored 0.94365,
-within noise, so the simpler model was kept.
+The final model is defined in [`src/final_config.py`](src/final_config.py) and implemented
+in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.96668**):
+
+1. **Stage 1:** a tuned, shallow LightGBM (9 leaves, 500 trees) on the 165 supplied features
+   scores labeled training rows out-of-fold (5 folds of consecutive time steps) and test rows
+   with the mean of the fold models.
+2. **Graph context:** over each transaction's *labeled* neighbours: stage-1 score
+   mean/max/in-mean/out-mean, degrees, labeled-neighbour count and share, and neighbour means
+   of five key features. Walk-weighted means over labeled nodes two hops away are added; walks
+   may pass through featureless nodes.
+3. **Stage 2:** the same LightGBM on supplied features plus graph context.
+4. **Weighting and seeds:** both stages weight training rows toward recent steps (half-life
+   14 steps); predictions are averaged over 10 seeds.
+
+Context uses only labeled nodes because, in the test period, only labeled transactions have
+features. Every graph feature is therefore computed the same way in training and test.
 
 ## Key findings
 
@@ -44,9 +56,14 @@ within noise, so the simpler model was kept.
   Aggregated (neighbourhood) features looked best on long windows, but scored 0.880 on
   Kaggle against 0.943 for all features. The aggregated features drift about twice as much
   into the test period as within training.
-* **Regularisation is the main lever.** Every hyperparameter search chose 4–9 leaves or depth
-  3–4. XGBoost, CatBoost, cross-family ensembles, GraphSAGE and pseudo-labeling did not beat a
-  tuned LightGBM.
+* **Regularisation is the main lever for the base model.** Every hyperparameter search chose
+  4–9 leaves or depth 3–4. XGBoost, CatBoost, cross-family ensembles, GraphSAGE and
+  pseudo-labeling did not beat a tuned LightGBM.
+* **Graph context, computed the same way in training and test, drives the largest gains.**
+  Labeled transactions cluster: 57% of an illicit transaction's labeled neighbours are illicit,
+  against a 12% base rate. Labeled-neighbour stacking (+0.010), neighbour feature means (+0.005)
+  and two-hop context (+0.003) took the public score from 0.944 to 0.967. Recency weighting adds
+  about +0.005 independently.
 
 | Kaggle submission | Public ROC-AUC |
 |---|---|
@@ -55,11 +72,17 @@ within noise, so the simpler model was kept.
 | `shallow_all` (regularised LightGBM, 10 seeds) | 0.94267 |
 | 50/50 rank blend all-features + aggregated-only | 0.92624 |
 | `shallow_agg` (aggregated features only) | 0.88023 |
-| `tuned_lgbm_all` (final model) | **0.94417** |
+| `tuned_lgbm_all` (best non-graph model) | 0.94417 |
 | `tuned_lgbm_all` minus five test-drifted features | 0.94365 |
 | `tuned_lgbm_all_no_feat2` | 0.93673 |
+| `halflife_14` (recency weights) | 0.95066 |
+| `nbr_stack` (labeled-neighbour stacking) | 0.95389 |
+| `nbr_stack_rich` (+ neighbour features, structure) | 0.95871 |
+| `nbr_stack_rich_hl14` (+ recency) | 0.96342 |
+| `nbr_stack_wide_hl14` (25-feature neighbour statistics) | 0.96506 |
+| `nbr_stack_rich_2hop_hl14` (+ two-hop context, **final model**) | **0.96668** |
 
-Later rounds are recorded in `report/findings.md`.
+Full commentary for every round is in `report/findings.md`.
 
 ## Experiment scripts
 
@@ -70,7 +93,7 @@ Later rounds are recorded in `report/findings.md`.
 | `src/run_step3_features.py` | Correlated-cluster ablation, TreeSHAP stability, adversarial feature dropping |
 | `src/run_step4_tuning.py` | Optuna tuning (LightGBM / XGBoost / CatBoost) on short-horizon windows; ensemble evaluation |
 | `src/run_step5_stress.py` | Stress tests: extra drift, feature noise, withheld fraud-heavy steps, rare positives |
-| `src/run_step8_variants.py` | Round-3 variants: recency weighting, temporal bagging, labeled-neighbour stacking |
+| `src/run_step8_variants.py` | Rounds 3–6: recency weighting, temporal bagging, graph-stacking variants (`evaluate`, `submit`, `blend`) |
 | `src/run_step6_extensions.py` | Directed GraphSAGE with test-consistent masking (`src/gnn_v2.py`); pseudo-labeling |
 | `src/run_feature_experiments.py`, `src/run_feature_importance.py`, `src/run_lgbm_robustness_experiments.py`, `src/run_graph_benchmark.py`, `src/gt_ssl_extractor.py` | Earlier single-holdout experiments (degree features, permutation importance, recency weighting, first GraphSAGE, GT-SSL embedding pilot) |
 
@@ -89,4 +112,6 @@ not tracked; summary tables are.
   29–35 are held out to confirm the choices.
 * Limitation: no window inside steps 1–35 reproduces the train→test drift, so final choices
   between close candidates rely on the Kaggle public leaderboard. It covers about 4,600
-  rows, so differences below about 0.005 are noise.
+  rows (about 270 illicit), so a single public score has a standard error of about 0.008.
+  Differences between closely related models on the same rows are more precise (about
+  0.001–0.002).
