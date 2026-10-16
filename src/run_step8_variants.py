@@ -7,6 +7,8 @@ and is then judged on the Kaggle public leaderboard. Variants:
 ``recent_K``      train only on the last K labeled time steps before the cut-off
 ``halflife_H``    exponential recency weights with half-life H steps (mean-one weights)
 ``temporal_bag``  rank-average of models trained on all steps, the last 25 and the last 15
+``nbr_stack_wide_2hop_hl21``
+                  round-7: recency sensitivity of the best model (half-life 21)
 ``nbr_stack_wide_2hop_hl14`` / ``nbr_stack_rich_2hop_prop_hl14``
                   round-6: wide + two-hop; two-hop + 3-hop score propagation
 ``nbr_stack_rich_hl14`` / ``nbr_stack_wide_hl14`` / ``nbr_stack_rich_2hop_hl14``
@@ -102,6 +104,7 @@ def variants():
     registry["nbr_stack_wide_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, wide=True)
     registry["nbr_stack_rich_2hop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True)
     registry["nbr_stack_wide_2hop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, wide=True, two_hop=True)
+    registry["nbr_stack_wide_2hop_hl21"] = make_neighbour_stack(half_life_steps=21, rich=True, wide=True, two_hop=True)
     registry["nbr_stack_rich_2hop_prop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, propagate=True)
     return registry
 
@@ -131,12 +134,13 @@ def evaluate(labeled, columns, graph, names=None, prefix="round3"):
     print(tables["summary"].round(4).to_string(index=False))
 
 
-def submit(labeled, test, columns, graph, names, sample_submission):
+def submit(labeled, test, columns, graph, names, sample_submission, seeds=SUBMIT_SEEDS):
     registry = variants()
+    suffix = "" if tuple(seeds) == SUBMIT_SEEDS else f"_s{len(seeds)}"
     for name in names:
-        scores = np.mean([registry[name](labeled, test, columns, seed, graph) for seed in SUBMIT_SEEDS], axis=0)
+        scores = np.mean([registry[name](labeled, test, columns, seed, graph) for seed in seeds], axis=0)
         submission = pd.DataFrame({"index": test["index"].to_numpy(), "target": scores})
-        path = write_submission(submission, Path("submissions") / f"submission_{name}.csv", sample_submission=sample_submission)
+        path = write_submission(submission, Path("submissions") / f"submission_{name}{suffix}.csv", sample_submission=sample_submission)
         print(f"Wrote {path}", flush=True)
 
 
@@ -157,6 +161,7 @@ def main():
     parser.add_argument("command", choices=["evaluate", "submit", "blend"])
     parser.add_argument("names", nargs="*")
     parser.add_argument("--prefix", default=None, help="output table prefix for evaluate (default round3/round4)")
+    parser.add_argument("--seeds", type=int, default=len(SUBMIT_SEEDS), help="submit: number of seeds (0..N-1); files get an _sN suffix unless N=10")
     args = parser.parse_args()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     train, test, edges, sample_submission = load_data()
@@ -168,7 +173,7 @@ def main():
     elif args.command == "evaluate":
         evaluate(labeled, columns, graph, args.names, prefix=args.prefix or ("round4" if args.names else "round3"))
     else:
-        submit(labeled, test, columns, graph, args.names, sample_submission)
+        submit(labeled, test, columns, graph, args.names, sample_submission, seeds=tuple(range(args.seeds)))
 
 
 if __name__ == "__main__":

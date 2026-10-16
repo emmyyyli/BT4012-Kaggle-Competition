@@ -1027,6 +1027,149 @@ wide+2hop 0.984, blend 0.989.
 
 | File | Purpose | Public AUC |
 |---|---|---|
-| `submission_nbr_stack_rich_2hop_prop_hl14.csv` | longer reach (3-hop propagation) | _pending_ |
-| `submission_nbr_stack_wide_2hop_hl14.csv` | detail + reach combined | _pending_ |
-| `submission_blend_top_graph.csv` | variance-reduced blend for the private LB | _pending_ |
+| `submission_nbr_stack_rich_2hop_prop_hl14.csv` | longer reach (3-hop propagation) | **0.96108** (2026-10-16) |
+| `submission_nbr_stack_wide_2hop_hl14.csv` | detail + reach combined | **0.96814** (2026-10-16) |
+| `submission_blend_top_graph.csv` | variance-reduced blend for the private LB | **0.96587** (2026-10-16) |
+
+## 23. Kaggle round 6 (2026-10-16) — the top is flat; choosing the two private picks
+
+| Submission | Public ROC-AUC | Δ vs best | Rank ρ vs best | Paired SE | z |
+|---|---|---|---|---|---|
+| **nbr_stack_wide_2hop_hl14** | **0.96814** | — | — | — | — |
+| nbr_stack_rich_2hop_hl14 (notebook model) | 0.96668 | −0.0015 | 0.984 | 0.0014 | 1.1 |
+| blend_top_graph (2hop + wide + rich_hl14) | 0.96587 | −0.0023 | 0.983 | 0.0014 | 1.6 |
+| nbr_stack_wide_hl14 | 0.96506 | −0.0031 | 0.977 | 0.0016 | 1.9 |
+| nbr_stack_rich_hl14 | 0.96342 | −0.0047 | 0.962 | 0.0021 | 2.2 |
+| nbr_stack_rich_2hop_prop_hl14 | 0.96108 | −0.0071 | 0.948 | 0.0025 | 2.8 |
+
+The paired SE is the Hanley–McNeil public SE (0.0077) combined with the test rank correlation
+as a proxy for the correlation of the two AUC estimates; it is approximate. Leader at the time:
+0.96849, only 0.0004 ahead of our best.
+
+**Implications.**
+1. **The leading models are statistically indistinguishable on the public LB.**
+   wide_2hop leads 2hop by 1.1 SE and the blend by 1.6 SE; neither passes the ≥ +0.003 switching
+   rule (§20.2). Combining wide + two-hop helped a little (+0.0015 over two-hop, +0.0031 over
+   wide alone) but not conclusively. The graph-context gains have reached diminishing returns.
+2. **3-hop score propagation hurt (−0.0056 vs its parent, ≈ 3 SE).** Locally it was the
+   *most* stable graph variant on long windows, yet it was the worst on Kaggle. Long-window
+   robustness has again failed to predict test performance (§6, §14). A plausible mechanism:
+   random walks of up to 3 hops average over large, mixed neighbourhoods, which dilutes the
+   sharp local fraud clusters that one- and two-hop context capture. Score propagation is
+   rejected; reach beyond two hops does not help.
+3. **The blend behaves as designed:** 0.96587 is within 0.0008 of its best member (2hop) and
+   above its other two members. Averaging graph models costs little public score while
+   averaging over three feature configurations.
+
+### 23.1 Stability vs public performance: is there a trade-off?
+
+- **The public/private split is a random partition of the same test rows** (standard Kaggle
+  practice; both parts cover steps 36–49). Public AUC is therefore an *unbiased but noisy*
+  estimate of private AUC (SE ≈ 0.0077 public, 0.0051 private), except for **selection bias**:
+  about 20 submissions have been ranked on the same public rows, so the best-scoring one is
+  slightly flattering. With paired SEs of about 0.0015 among the top models, the expected
+  inflation of the top public score over its peers is of order 0.001.
+- **There is no systematic trade-off between "public-tuned" and "stable"** of the kind that
+  would arise if the public rows came from a different period. The risk is narrower: the private
+  ranking among our top 3–4 models is a near coin-flip, and a model with more free parameters
+  (wide_2hop: 125 extra neighbour statistics + two-hop context) carries a little more fitting
+  variance than a smaller one.
+- **Local evidence on "steadiness" for wide_2hop** is mixed: seed sd 0.0023 (in line with the
+  others), but the largest long-window loss of any variant (0.862 on ≤21→22–35). Since long
+  windows have repeatedly failed to predict the test set, this is weak evidence against it.
+- **Kaggle scores the *better* of the two selected submissions on the private LB.** The second
+  pick is therefore insurance: it should be strong in its own right *and* fail differently
+  from the first. Among strong candidates, diversity is limited: the top models flag 90–95% of
+  the same top-6% riskiest test rows.
+
+### 23.2 Recommended final picks (as of 2026-10-16)
+
+| Pick | Model | Public | Role |
+|---|---|---|---|
+| 1 — performance | **nbr_stack_wide_2hop_hl14** | 0.96814 | highest public score; richest graph context |
+| 2 — steady | **a blend of the top graph models** (currently `blend_top_graph`, 0.96587; see next steps for a 4-model version that includes wide_2hop) | 0.966 ± | averages over feature configurations; within ~0.002 of the best; lower model variance |
+
+Alternative pick 2: nbr_stack_rich_2hop_hl14 (0.96668), the simpler model that the notebook
+already reproduces exactly. Its public score is higher than the current blend's, but it is a
+single configuration.
+
+**Deliverable alignment:** the brief asks for the notebook of the *top* submission. If wide_2hop
+stays pick 1, switch `FINAL_STACK` to `{half_life_steps: 14, rich: True, wide: True,
+two_hop: True}` and rebuild the notebook, verifying it reproduces
+`submission_nbr_stack_wide_2hop_hl14.csv`.
+
+## 24. Next steps (2026-10-16): consolidate rather than chase the public LB
+
+Eight competition days remain (≈24 submissions), but further public-LB gains of about 0.001
+cannot be told apart from noise and add selection bias. Priorities:
+
+| # | Step | Purpose |
+|---|---|---|
+| 1 | **wide_2hop with 30 seeds** | Lower seed variance for pick 1; if the public score is unchanged (±0.001), the 10-seed result was not a lucky seed draw |
+| 2 | **`blend_top4`**: rank average of wide_2hop, 2hop, wide, rich_hl14 | Steady pick 2 that includes the best model; expected ≈ 0.967 |
+| 3 | **Recency sensitivity**: wide_2hop with half-life 21 (and/or 10) | Stability check. A similar score shows the model is not tuned to a lucky half-life; only adopt if it gains ≥ 0.003 |
+| 4 | **Port pick 1 into `final_config.py` + notebook** and re-verify byte-identical reproduction | Required deliverable |
+| 5 | **Write the 4-page report** from §1, §6, §11, §14, §17, §20, §23 (the narrative: base model plateau → validation lessons → graph context defined the same way in train and test → recency → private-LB strategy) | Due 25 Oct |
+
+Not recommended: 3+-hop propagation (§23), further wide/two-hop expansions, and blends with
+non-graph models (§17).
+
+## 25. Round 7 builds, stability evidence, and whether further gains are real (2026-10-16)
+
+**Deliverable switched to pick 1.**
+- `FINAL_STACK = {half_life_steps: 14, rich: True, wide: True, two_hop: True}`
+  (nbr_stack_wide_2hop_hl14).
+- The rebuilt `e1304439.ipynb` reproduces `submission_nbr_stack_wide_2hop_hl14.csv`
+  byte-for-byte (max abs difference 0.0; 0 notebook errors).
+- `SECOND_PICK_BLEND` and the simpler alternative (rich_2hop) are documented in
+  `src/final_config.py`.
+
+**Round 7 files** (`src/run_step8_variants.py`; `--seeds` option, new
+`nbr_stack_wide_2hop_hl21`):
+
+| File | Purpose | Test rank ρ with wide_2hop (10 seeds) | Public AUC |
+|---|---|---|---|
+| `submission_nbr_stack_wide_2hop_hl14_s30.csv` | same model, 30 seeds | **0.9997** | _pending_ |
+| `submission_nbr_stack_wide_2hop_hl21.csv` | recency half-life 21 instead of 14 | **0.9977** | _pending_ |
+| `submission_blend_top4.csv` | rank blend: wide_2hop + rich_2hop + wide + rich_hl14 | 0.9902 | _pending_ |
+
+**The model is stable.**
+- Tripling the seeds changes the test ranking almost not at all (ρ 0.9997), so seed variance
+  is negligible at 10 seeds.
+- Changing the recency half-life by 50% changes it very little (ρ 0.9977), so the result does
+  not hinge on a lucky hyperparameter.
+- Expect both files to score within about ±0.001 of 0.96814. A larger move would point to
+  public-LB sampling noise, not a model change.
+- Only the blend differs enough (ρ 0.990) to carry new information. It is the candidate for the
+  steady second pick.
+
+### 25.1 Is there room for real improvement, or only noise?
+
+Leaderboard top: **0.96978**; our best 0.96814. Gap **0.0016**.
+
+1. **The gap to the leader is not statistically meaningful.** One public AUC has SE ≈ 0.0077
+   (≈ 270 illicit rows). The difference between two *different teams'* models is at least that
+   uncertain unless their predictions are nearly identical. 0.0016 is about 0.2 SE, so the
+   private ranking between the top entries is close to a toss-up.
+2. **Our remaining candidate ideas fall below what the public LB can detect.** The last round
+   moved the best score by +0.0015 (≈ 1 paired SE). Untested ideas that still add information
+   would be directional two-hop paths (forward-forward vs backward-backward flows) and
+   co-spending neighbours (transactions sharing an input source). They are plausible at
+   +0.001–0.002, smaller than the ≈ 0.003 needed to confirm a gain at 2 paired SE. Adopting
+   them on public score alone would mean **selecting on noise**: each extra comparison raises
+   the chance that a "winner" is a lucky draw on the 30% public rows, with no expected gain on
+   the 70% private rows.
+3. **Remaining variance is test-sample noise, not model noise.** Seeds and recency are settled
+   (above). What remains is which 30% of rows are public, which no modelling choice can reduce.
+4. **The grade value of chasing the leader is small.** If private scores matched public ones,
+   10 × (0.96814/0.96978)^5 = **9.92 / 10**. Closing the whole gap is worth about +0.08 ranking
+   points. The report (5 points) and the code/reproducibility component (5 points) now offer
+   far more value per hour.
+
+**Recommendation: freeze modelling after round 7.**
+- Upload the three round-7 files as confirmation.
+- Select **pick 1 = nbr_stack_wide_2hop_hl14** (10- or 30-seed file, whichever is not clearly
+  worse) and **pick 2 = blend_top4** (or blend_top_graph if blend_top4 scores lower).
+- Spend the remaining days on the report. Reopen modelling only for an idea with a *mechanistic*
+  reason to add ≥ 0.003 (for example, new information about the test period). Not for
+  parameter or combination searches.

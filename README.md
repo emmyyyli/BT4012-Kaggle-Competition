@@ -27,14 +27,14 @@ python -m pytest                     # unit tests
 ```
 
 The final model is defined in [`src/final_config.py`](src/final_config.py) and implemented
-in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.96668**):
+in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.96814**):
 
 1. **Stage 1:** a tuned, shallow LightGBM (9 leaves, 500 trees) on the 165 supplied features
    scores labeled training rows out-of-fold (5 folds of consecutive time steps) and test rows
    with the mean of the fold models.
 2. **Graph context:** over each transaction's *labeled* neighbours: stage-1 score
-   mean/max/in-mean/out-mean, degrees, labeled-neighbour count and share, and neighbour means
-   of five key features. Walk-weighted means over labeled nodes two hops away are added; walks
+   mean/max/in-mean/out-mean, degrees, labeled-neighbour count and share, and
+   mean/max/std/in-mean/out-mean of the 25 most influential supplied features. Walk-weighted means over labeled nodes two hops away are added; walks
    may pass through featureless nodes.
 3. **Stage 2:** the same LightGBM on supplied features plus graph context.
 4. **Weighting and seeds:** both stages weight training rows toward recent steps (half-life
@@ -62,7 +62,7 @@ features. Every graph feature is therefore computed the same way in training and
 * **Graph context, computed the same way in training and test, drives the largest gains.**
   Labeled transactions cluster: 57% of an illicit transaction's labeled neighbours are illicit,
   against a 12% base rate. Labeled-neighbour stacking (+0.010), neighbour feature means (+0.005)
-  and two-hop context (+0.003) took the public score from 0.944 to 0.967. Recency weighting adds
+  and two-hop context (+0.003) took the public score from 0.944 to 0.968. Recency weighting adds
   about +0.005 independently.
 
 | Kaggle submission | Public ROC-AUC |
@@ -80,7 +80,10 @@ features. Every graph feature is therefore computed the same way in training and
 | `nbr_stack_rich` (+ neighbour features, structure) | 0.95871 |
 | `nbr_stack_rich_hl14` (+ recency) | 0.96342 |
 | `nbr_stack_wide_hl14` (25-feature neighbour statistics) | 0.96506 |
-| `nbr_stack_rich_2hop_hl14` (+ two-hop context, **final model**) | **0.96668** |
+| `nbr_stack_rich_2hop_hl14` (+ two-hop context) | 0.96668 |
+| `nbr_stack_rich_2hop_prop_hl14` (+ 3-hop score propagation) | 0.96108 |
+| `blend_top_graph` (rank blend of three graph models) | 0.96587 |
+| `nbr_stack_wide_2hop_hl14` (wide statistics + two-hop, **final model**) | **0.96814** |
 
 Full commentary for every round is in `report/findings.md`.
 

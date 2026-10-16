@@ -47,7 +47,7 @@ experiments that led to these choices are run by the scripts in `src/` and recor
   in the test period, so every graph feature is computed the same way in training and test.
 * Training rows are weighted toward recent steps (half-life 14 steps).
 * Both stages use a tuned, shallow LightGBM; the configuration is in `src/final_config.py`
-  (Kaggle public ROC-AUC 0.96668).
+  (Kaggle public ROC-AUC 0.96814).
 """),
     code("""
 from pathlib import Path
@@ -170,8 +170,9 @@ than on the aggregated group.
    models.
 2. **Graph context** — for every transaction: mean / max / incoming-mean / outgoing-mean of
    stage-1 scores over labeled neighbours; in/out degree; number and share of labeled
-   neighbours; neighbour means of feat_53, feat_59, feat_61, feat_5, feat_3; and walk-weighted
-   two-hop means of the stage-1 score and those five features.
+   neighbours; mean / max / std / incoming-mean / outgoing-mean over labeled neighbours of the
+   25 most influential supplied features; and walk-weighted two-hop means of the stage-1 score
+   and of feat_53, feat_59, feat_61, feat_5, feat_3.
 3. **Stage 2** — the same LightGBM on supplied features + graph context.
 4. Both stages weight training rows by 2^((t - last step)/14); classes are balanced; seeds
    0-9 are averaged.

@@ -1,0 +1,18 @@
+Wrote submissions/submission_nbr_stack_wide_2hop_hl14_s30.csv
+Wrote submissions/submission_nbr_stack_wide_2hop_hl21.csv
+Wrote submissions/submission_blend_top4.csv
+[IPKernelApp] WARNING | Kernel is running over TCP without encryption. All communication (including code and outputs) is sent in plain text and is susceptible to eavesdropping. Use IPC transport or launch with kernel manager-provisioned CurveZMQ keys to enable transport encryption.
+Wrote e1304439.ipynb
+nb_exit=0
+final == scored wide_2hop file: True max abs diff 0.0
+notebook errors: 0
+                              nbr_stack_wide_2hop_hl14  nbr_stack_wide_2hop_hl14_s30  nbr_stack_wide_2hop_hl21  blend_top4  blend_top_graph  nbr_stack_rich_2hop_hl14
+nbr_stack_wide_2hop_hl14                        1.0000                        0.9997                    0.9977      0.9902           0.9825                    0.9839
+nbr_stack_wide_2hop_hl14_s30                    0.9997                        1.0000                    0.9981      0.9904           0.9830                    0.9845
+nbr_stack_wide_2hop_hl21                        0.9977                        0.9981                    1.0000      0.9901           0.9831                    0.9839
+blend_top4                                      0.9902                        0.9904                    0.9901      1.0000           0.9989                    0.9908
+blend_top_graph                                 0.9825                        0.9830                    0.9831      0.9989           1.0000                    0.9888
+nbr_stack_rich_2hop_hl14                        0.9839                        0.9845                    0.9839      0.9908           0.9888                    1.0000
+nbr_stack_wide_2hop_hl14_s30 (15329, 2) True True
+nbr_stack_wide_2hop_hl21 (15329, 2) True True
+blend_top4 (15329, 2) True True
