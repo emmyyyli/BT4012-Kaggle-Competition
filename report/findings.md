@@ -1252,3 +1252,32 @@ Grade proxy if private scores track public ones: 10 × (0.96814/0.97012)^5 = **9
   a single comparison.
 - **Everything else** (more seeds, half-life, more feature statistics, more blends) has been
   shown to move the public score by ≤ 0.0015, i.e. within noise.
+
+## 28. Round 8: one extra round of collective classification (2026-10-17)
+
+**Code:** `graph_stacking.make_neighbour_stack(..., extra_rounds=1)`. Before the final stage,
+every row is re-scored out-of-fold by a model that already uses graph context. The neighbour
+and two-hop context is then rebuilt from those stage-2 scores, and a third stage is fitted.
+Target rows get the mean of the fold models at each round. The default path
+(`extra_rounds=0`) was verified byte-identical to the pre-refactor code (max abs difference 0.0
+on a seed-0 window), so `e1304439.ipynb` still reproduces pick 1. Variant:
+`nbr_stack_wide_2hop_hl14_iter`. Test: `tests/test_round3_variants.py`. Tables:
+`artifacts/round3/round8_*.csv`.
+
+Local check (2 seeds):
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean |
+|---|---|---|---|---|---|---|
+| wide_2hop (pick 1, public 0.96814) | 0.8798 | 0.9359 | 0.8620 | **0.9970** | 0.9982 | 0.9346 |
+| **wide_2hop + 1 extra round** | **0.8804** | **0.9413** | **0.8731** | 0.9968 | 0.9982 | **0.9380** |
+
+- The extra round recovers part of the long-window loss (+0.005 / +0.011 on the windows that
+  include steps 22–28) and is flat on the Kaggle-aligned short windows.
+- Test rank correlation with pick 1 is **0.9935**, so a large public change is unlikely.
+
+**Pre-registered rule:** adopt it as pick 1 only if its public AUC is ≥ 0.97114 (0.96814 +
+0.003). Otherwise picks stay as in §27.
+
+| File | Public AUC |
+|---|---|
+| `submission_nbr_stack_wide_2hop_hl14_iter.csv` | _pending_ |
