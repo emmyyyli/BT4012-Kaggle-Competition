@@ -124,3 +124,22 @@ def test_extra_round_of_collective_classification_returns_scores():
     iterated = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, extra_rounds=1)(train, target, columns, 0, graph)
     assert iterated.shape == plain.shape == (len(target),)
     assert np.all((iterated >= 0) & (iterated <= 1))
+
+
+def test_directional_two_hop_separates_payment_patterns():
+    from src.graph_stacking import directional_two_hop_features
+
+    # a -> b -> c (b unlabeled); d -> b ; b -> e.  For a: fwd reaches c and e, cospent reaches d.
+    edges = pd.DataFrame({"txId1": ["a", "b", "d", "b"], "txId2": ["b", "c", "b", "e"]})
+    frame = pd.DataFrame({"txId": ["a", "c", "d", "e"]})
+    scores = pd.Series({"a": 0.1, "c": 0.5, "d": 0.9, "e": 0.7})
+    out = directional_two_hop_features(build_graph(edges), frame, scores)
+
+    assert out.loc["a", "dir2_fwd_walks"] == 2
+    assert out.loc["a", "dir2_fwd_score_mean"] == pytest.approx(0.6)
+    assert out.loc["a", "dir2_cospent_walks"] == 1  # d also spends into b; a itself excluded
+    assert out.loc["a", "dir2_cospent_score_mean"] == pytest.approx(0.9)
+    assert out.loc["a", "dir2_bwd_walks"] == 0
+    assert out.loc["c", "dir2_bwd_walks"] == 2  # a and d are grandparents of c
+    assert out.loc["c", "dir2_cofunded_walks"] == 1  # e is c's sibling via b
+    assert out.loc["c", "dir2_cofunded_score_mean"] == pytest.approx(0.7)

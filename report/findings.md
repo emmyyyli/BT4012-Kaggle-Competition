@@ -1327,3 +1327,35 @@ not re-processing of existing information.
 The grade sensitivity is small. At (AUC/best)^5, each 0.001 of private AUC is worth about
 0.05 of 10 ranking points. The remaining 5 report points and the code/reproducibility component
 are better uses of the last week.
+
+## 31. Round 9: direction-split two-hop context (2026-10-17)
+
+**Code:** `graph_stacking.directional_two_hop_features` (option `directional=True`); variant
+`nbr_stack_wide_2hop_dir_hl14` = pick 1 + 8 features. The features are the walk-weighted mean
+stage-1 score and walk count for each two-step payment pattern:
+- **forward** a→b→c: where the money went;
+- **backward** c→b→a: where it came from;
+- **co-spent** a→b←c: outputs spent together in one transaction, i.e. consolidation;
+- **co-funded** a←b→c: siblings paid by one transaction, i.e. fan-out.
+
+Paths pass through featureless nodes, and only labeled nodes count as endpoints. Default
+behaviour is unchanged (byte-identical check). Unit-tested on a hand-built graph. Tables:
+`artifacts/round3/round9_*.csv`.
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean |
+|---|---|---|---|---|---|---|
+| wide_2hop (pick 1, public 0.96814) | 0.8798 | 0.9359 | 0.8620 | **0.9970** | 0.9982 | 0.9346 |
+| + directional two-hop | **0.8829** | 0.9354 | 0.8615 | 0.9967 | 0.9982 | **0.9349** |
+
+- The directional split changes almost nothing locally (mean +0.0003, short windows −0.0003 /
+  0.0000).
+- Test rank correlation with pick 1 is **0.9983**, the closest of any variant except the
+  30-seed rerun.
+- The undirected two-hop means already carry most of what direction adds; the stage-2 model
+  makes little use of the split.
+- **Expected public score: within ±0.001 of 0.96814.** The adoption rule (≥ 0.97114) is very
+  unlikely to be met.
+
+| File | Public AUC |
+|---|---|
+| `submission_nbr_stack_wide_2hop_dir_hl14.csv` | _pending_ |

@@ -149,6 +149,62 @@ def two_hop_features(graph, frame, scores, mean_features=RICH_NEIGHBOUR_FEATURES
     return out
 
 
+_DIRECTED_CACHE = {}
+
+
+def _directed_adjacency(graph):
+    """Binary directed adjacency (row = spending source u, column = spender v), cached per graph."""
+    key = id(graph)
+    if key not in _DIRECTED_CACHE:
+        nodes, _ = _undirected_adjacency(graph)
+        out_edges = graph.loc[graph["direction"] == "out"]
+        rows, cols = nodes.get_indexer(out_edges["u"]), nodes.get_indexer(out_edges["v"])
+        matrix = sp.csr_matrix((np.ones(len(rows)), (rows, cols)), shape=(len(nodes), len(nodes)))
+        matrix.data[:] = 1.0
+        _DIRECTED_CACHE[key] = (nodes, matrix)
+    return _DIRECTED_CACHE[key]
+
+
+def directional_two_hop_features(graph, frame, scores):
+    """Two-hop stage-1 score means split by the direction of the two payment steps.
+
+    With D the directed adjacency (u -> v when an output of u is spent by v), for node a:
+    * ``fwd``  a -> b -> c   descendants two steps on (where the money went)
+    * ``bwd``  c -> b -> a   ancestors two steps back (where it came from)
+    * ``cospent``  a -> b <- c   co-inputs: outputs spent together in one transaction b
+    * ``cofunded`` a <- b -> c   siblings paid by the same transaction b (fan-out)
+    Paths may pass through featureless nodes; only nodes in ``frame`` count as endpoints, and a
+    node never counts as its own co-input or sibling. Returns a walk-weighted mean score and
+    walk count per pattern.
+    """
+    nodes, directed = _directed_adjacency(graph)
+    transpose = directed.T.tocsr()
+    out_degree = np.asarray(directed.sum(axis=1)).ravel()
+    in_degree = np.asarray(transpose.sum(axis=1)).ravel()
+    position = nodes.get_indexer(frame["txId"])
+    present = position >= 0
+    index = np.clip(position, 0, None)
+    mask = np.zeros(len(nodes))
+    mask[position[present]] = 1.0
+    values = np.zeros(len(nodes))
+    values[position[present]] = scores.reindex(frame["txId"]).to_numpy()[present]
+    patterns = {
+        "fwd": lambda x: directed @ (directed @ x),
+        "bwd": lambda x: transpose @ (transpose @ x),
+        "cospent": lambda x: directed @ (transpose @ x) - out_degree * x,
+        "cofunded": lambda x: transpose @ (directed @ x) - in_degree * x,
+    }
+    out = pd.DataFrame(index=frame["txId"])
+    for name, walk in patterns.items():
+        counts = walk(mask)
+        sums = walk(values)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            mean = np.where(counts > 0.5, sums / counts, np.nan)
+        out[f"dir2_{name}_walks"] = np.where(present, counts[index], 0.0)
+        out[f"dir2_{name}_score_mean"] = np.where(present, mean[index], np.nan)
+    return out
+
+
 def propagation_features(graph, frame, scores, hops=3, decay=0.5):
     """Label-free score propagation over the full graph (featureless nodes pass the walk on).
 
@@ -186,7 +242,7 @@ def propagation_features(graph, frame, scores, hops=3, decay=0.5):
     )
 
 
-def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0):
+def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False):
     """Two-stage stacking over labeled neighbours.
 
     ``half_life_steps``: recency weights in every stage (relative to the last training step).
@@ -197,6 +253,8 @@ def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=F
     WIDE_NEIGHBOUR_FEATURES over labeled neighbours (requires ``rich``).
     ``two_hop``: add walk-weighted two-hop means of stage-1 scores and the rich features.
     ``propagate``: add 3-hop label-free score propagation (``propagation_features``).
+    ``directional``: add two-hop score means split by payment direction
+    (``directional_two_hop_features``: forward, backward, co-spent, co-funded).
     ``extra_rounds``: iterative (collective) classification. Before the final stage, repeat
     this many times: score every row out-of-fold with a model that uses the current graph
     context, then rebuild the context from those (more accurate) scores. 0 = plain two-stage.
@@ -229,6 +287,8 @@ def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=F
                 neighbour = neighbour.join(two_hop_features(graph, both, scores))
             if propagate:
                 neighbour = neighbour.join(propagation_features(graph, both, scores))
+            if directional:
+                neighbour = neighbour.join(directional_two_hop_features(graph, both, scores))
         return neighbour
 
     def with_context(train, target, columns, neighbour):

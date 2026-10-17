@@ -7,6 +7,8 @@ and is then judged on the Kaggle public leaderboard. Variants:
 ``recent_K``      train only on the last K labeled time steps before the cut-off
 ``halflife_H``    exponential recency weights with half-life H steps (mean-one weights)
 ``temporal_bag``  rank-average of models trained on all steps, the last 25 and the last 15
+``nbr_stack_wide_2hop_dir_hl14``
+                  round-9: + two-hop score means split by payment direction
 ``nbr_stack_wide_2hop_hl14_iter``
                   round-8: one extra round of collective classification (context rebuilt
                   from out-of-fold stage-2 scores, then a third stage)
@@ -108,6 +110,7 @@ def variants():
     registry["nbr_stack_rich_2hop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True)
     registry["nbr_stack_wide_2hop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, wide=True, two_hop=True)
     registry["nbr_stack_wide_2hop_hl21"] = make_neighbour_stack(half_life_steps=21, rich=True, wide=True, two_hop=True)
+    registry["nbr_stack_wide_2hop_dir_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, wide=True, two_hop=True, directional=True)
     registry["nbr_stack_wide_2hop_hl14_iter"] = make_neighbour_stack(half_life_steps=14, rich=True, wide=True, two_hop=True, extra_rounds=1)
     registry["nbr_stack_rich_2hop_prop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, propagate=True)
     return registry
