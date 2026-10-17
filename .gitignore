@@ -29,3 +29,6 @@ submissions/*.csv
 # Large per-row prediction dumps from the experiment runners (summaries stay tracked)
 artifacts/**/*.csv.gz
 artifacts/stress/stress_predictions.csv
+
+# Intermediate HTML from src/build_report.py
+report/*.html

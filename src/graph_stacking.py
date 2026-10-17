@@ -186,10 +186,10 @@ def propagation_features(graph, frame, scores, hops=3, decay=0.5):
     )
 
 
-def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False):
+def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0):
     """Two-stage stacking over labeled neighbours.
 
-    ``half_life_steps``: recency weights in both stages (relative to the last training step).
+    ``half_life_steps``: recency weights in every stage (relative to the last training step).
     ``rich``: add structure + neighbour feature means, and score target rows with the mean of
     the out-of-fold models so that training and target neighbour scores come from the same
     kind of model (instead of a separate model fitted on all training rows).
@@ -197,28 +197,27 @@ def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=F
     WIDE_NEIGHBOUR_FEATURES over labeled neighbours (requires ``rich``).
     ``two_hop``: add walk-weighted two-hop means of stage-1 scores and the rich features.
     ``propagate``: add 3-hop label-free score propagation (``propagation_features``).
+    ``extra_rounds``: iterative (collective) classification. Before the final stage, repeat
+    this many times: score every row out-of-fold with a model that uses the current graph
+    context, then rebuild the context from those (more accurate) scores. 0 = plain two-stage.
     """
     def fit(frame, columns, seed, reference_step):
         weights = None if half_life_steps is None else _recency_weights(frame["time_step"], reference_step, half_life_steps)
         return _fit(frame, columns, seed, weights)
 
-    def fit_predict(train, target, columns, seed, graph):
-        train = train.reset_index(drop=True)
-        target = target.reset_index(drop=True)
-        reference = train["time_step"].max()
+    def out_of_fold(train, target, columns, seed, reference, score_target):
+        """Out-of-fold scores for ``train`` (folds = blocks of time steps) + fold models' target scores."""
         oof = np.full(len(train), np.nan)
         fold_target_scores = []
         for fold_steps in np.array_split(np.sort(train["time_step"].unique()), STACK_FOLDS):
             held = train["time_step"].isin(fold_steps).to_numpy()
             model = fit(train.loc[~held], columns, seed, reference)
             oof[held] = model.predict_proba(train.loc[held, columns])[:, 1]
-            if rich:
+            if score_target:
                 fold_target_scores.append(model.predict_proba(target[columns])[:, 1])
-        if rich:
-            target_scores = np.mean(fold_target_scores, axis=0)
-        else:
-            target_scores = fit(train, columns, seed, reference).predict_proba(target[columns])[:, 1]
-        scores = pd.concat([pd.Series(oof, index=train["txId"]), pd.Series(target_scores, index=target["txId"])])
+        return oof, fold_target_scores
+
+    def graph_context(train, target, scores, graph):
         neighbour = neighbour_score_features(graph, scores)
         if rich:
             both = pd.concat([train, target], ignore_index=True)
@@ -230,10 +229,32 @@ def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=F
                 neighbour = neighbour.join(two_hop_features(graph, both, scores))
             if propagate:
                 neighbour = neighbour.join(propagation_features(graph, both, scores))
+        return neighbour
+
+    def with_context(train, target, columns, neighbour):
         stacked_columns = [*columns, *neighbour.columns]
-        train_x = pd.concat([train[columns], neighbour.loc[train["txId"]].reset_index(drop=True)], axis=1)
-        target_x = pd.concat([target[columns], neighbour.loc[target["txId"]].reset_index(drop=True)], axis=1)
-        model = fit(pd.concat([train_x, train[["time_step", "label"]]], axis=1), stacked_columns, seed, reference)
+        train_x = pd.concat(
+            [train[columns], neighbour.loc[train["txId"]].reset_index(drop=True), train[["txId", "time_step", "label"]]], axis=1
+        )
+        target_x = pd.concat([target[columns], neighbour.loc[target["txId"]].reset_index(drop=True), target[["txId"]]], axis=1)
+        return train_x, target_x, stacked_columns
+
+    def fit_predict(train, target, columns, seed, graph):
+        train = train.reset_index(drop=True)
+        target = target.reset_index(drop=True)
+        reference = train["time_step"].max()
+        oof, fold_target_scores = out_of_fold(train, target, columns, seed, reference, score_target=rich)
+        if rich:
+            target_scores = np.mean(fold_target_scores, axis=0)
+        else:
+            target_scores = fit(train, columns, seed, reference).predict_proba(target[columns])[:, 1]
+        scores = pd.concat([pd.Series(oof, index=train["txId"]), pd.Series(target_scores, index=target["txId"])])
+        for _ in range(extra_rounds):
+            train_x, target_x, stacked_columns = with_context(train, target, columns, graph_context(train, target, scores, graph))
+            oof, fold_target_scores = out_of_fold(train_x, target_x, stacked_columns, seed, reference, score_target=True)
+            scores = pd.concat([pd.Series(oof, index=train["txId"]), pd.Series(np.mean(fold_target_scores, axis=0), index=target["txId"])])
+        train_x, target_x, stacked_columns = with_context(train, target, columns, graph_context(train, target, scores, graph))
+        model = fit(train_x, stacked_columns, seed, reference)
         return model.predict_proba(target_x[stacked_columns])[:, 1]
 
     return fit_predict

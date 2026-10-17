@@ -106,3 +106,21 @@ def test_propagation_passes_through_featureless_nodes_with_decay():
     # hop1: P m at a = 0 ; hop2: P^2 m at a = 1 (half to a, half to c), weighted by 0.5
     assert out.loc["a", "prop_reach"] == pytest.approx(0.5)
     assert out.loc["a", "prop_score"] == pytest.approx(0.5)  # (0.5*0.2 + 0.5*0.8) / 1
+
+
+def test_extra_round_of_collective_classification_returns_scores():
+    from src.graph_stacking import RICH_NEIGHBOUR_FEATURES, make_neighbour_stack
+
+    columns = ["feat_1", "feat_2", *RICH_NEIGHBOUR_FEATURES]
+    train = _frame(np.repeat(np.arange(1, 11), 30), 0)
+    target = _frame(np.repeat([11, 12], 20), 1)
+    for frame in (train, target):
+        for column in RICH_NEIGHBOUR_FEATURES:
+            frame[column] = np.arange(len(frame), dtype=float)
+    ids = [*train["txId"], *target["txId"]]
+    graph = build_graph(pd.DataFrame({"txId1": ids[:-1], "txId2": ids[1:]}))
+
+    plain = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True)(train, target, columns, 0, graph)
+    iterated = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, extra_rounds=1)(train, target, columns, 0, graph)
+    assert iterated.shape == plain.shape == (len(target),)
+    assert np.all((iterated >= 0) & (iterated <= 1))
