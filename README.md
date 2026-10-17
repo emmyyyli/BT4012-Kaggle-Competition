@@ -84,6 +84,8 @@ features. Every graph feature is therefore computed the same way in training and
 | `nbr_stack_rich_2hop_prop_hl14` (+ 3-hop score propagation) | 0.96108 |
 | `blend_top_graph` (rank blend of three graph models) | 0.96587 |
 | `nbr_stack_wide_2hop_hl14` (wide statistics + two-hop, **final model**) | **0.96814** |
+| `nbr_stack_wide_2hop_hl14`, 30 seeds / half-life 21 (stability checks) | 0.96785 / 0.96670 |
+| `blend_top4` (rank blend of four graph models; private pick 2) | 0.96686 |
 
 Full commentary for every round is in `report/findings.md`.
 

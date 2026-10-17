@@ -1129,9 +1129,9 @@ non-graph models (§17).
 
 | File | Purpose | Test rank ρ with wide_2hop (10 seeds) | Public AUC |
 |---|---|---|---|
-| `submission_nbr_stack_wide_2hop_hl14_s30.csv` | same model, 30 seeds | **0.9997** | _pending_ |
-| `submission_nbr_stack_wide_2hop_hl21.csv` | recency half-life 21 instead of 14 | **0.9977** | _pending_ |
-| `submission_blend_top4.csv` | rank blend: wide_2hop + rich_2hop + wide + rich_hl14 | 0.9902 | _pending_ |
+| `submission_nbr_stack_wide_2hop_hl14_s30.csv` | same model, 30 seeds | **0.9997** | **0.96785** (2026-10-17) |
+| `submission_nbr_stack_wide_2hop_hl21.csv` | recency half-life 21 instead of 14 | **0.9977** | **0.96670** (2026-10-17) |
+| `submission_blend_top4.csv` | rank blend: wide_2hop + rich_2hop + wide + rich_hl14 | 0.9902 | **0.96686** (2026-10-17) |
 
 **The model is stable.**
 - Tripling the seeds changes the test ranking almost not at all (ρ 0.9997), so seed variance
@@ -1173,3 +1173,82 @@ Leaderboard top: **0.96978**; our best 0.96814. Gap **0.0016**.
 - Spend the remaining days on the report. Reopen modelling only for an idea with a *mechanistic*
   reason to add ≥ 0.003 (for example, new information about the test period). Not for
   parameter or combination searches.
+
+## 26. Report figures and triage metrics (2026-10-16)
+
+**Code:** `src/report_metrics.py` (`python -m src.report_metrics`). Outputs:
+`report/figures/fig1_public_auc.png`, `report/figures/fig2_context_coverage.png`,
+`artifacts/report/precision_recall.csv`, `artifacts/report/context_coverage.csv`.
+
+**Precision / recall on the Kaggle-aligned windows** (3 seeds, seed-averaged; non-graph
+tuned_lgbm_all vs final nbr_stack_wide_2hop_hl14). The validation windows are ~18% illicit
+(1,307/7,035 and 1,102/6,028), against ~6% in the test period. Fixed review budgets (top 3/6/10%)
+therefore saturate: precision is ≈1.0 for both models and recall is capped by the budget. So
+prevalence-adaptive operating points are reported instead:
+
+| Window | Model | ROC-AUC | PR-AUC | P = R at k = #illicit | P at 90% recall | P at 95% recall | best F1 (P / R) |
+|---|---|---|---|---|---|---|---|
+| ≤25 → 26–35 | non-graph | 0.9954 | 0.9820 | 0.9411 | 0.9680 | 0.9173 | 0.9419 (0.9670 / 0.9181) |
+| ≤25 → 26–35 | final stack | **0.9971** | **0.9895** | **0.9533** | **0.9850** | **0.9620** | **0.9570** (0.9607 / 0.9533) |
+| ≤28 → 29–35 | non-graph | 0.9960 | 0.9809 | 0.9456 | 0.9718 | 0.9399 | 0.9474 (0.9548 / 0.9401) |
+| ≤28 → 29–35 | final stack | **0.9982** | **0.9933** | **0.9655** | **0.9930** | **0.9785** | **0.9655** (0.9655 / 0.9655) |
+
+At 95% recall, false alarms among flagged transactions fall from 8.3% to 3.8% (≤25) and from
+6.0% to 2.1% (≤28), roughly halved. This is the triage meaning of the graph-context AUC gain.
+Caveat: these are the short windows, where every model is near the ceiling. The long windows
+favour the non-graph model locally (§22), while the test period favoured the graph model (§20).
+
+**Figures.**
+- **Figure 1:** public ROC-AUC of all 20 scored submissions (rounds R0–R6), the best-so-far
+  step line, labels for the steps that moved it, the leader at 0.96978 (dashed), and a ±1 SE
+  bar (0.0077) on the final score.
+- **Figure 2:** labeled-context coverage, training vs test rows: one hop 78.2% vs 74.6%; one or
+  two hops 92.5% vs 96.4%.
+
+Colours are categorical slots 1–2 of the dataviz reference palette (#2a78d6 blue,
+#eb6834 orange), validated for colour-vision deficiency (worst adjacent ΔE 9.2) and
+direct-labelled.
+
+## 27. Kaggle round 7 (2026-10-17) — stability confirmed; final picks fixed
+
+| Submission | Public ROC-AUC | Δ vs wide_2hop (10 seeds, 0.96814) |
+|---|---|---|
+| wide_2hop, 30 seeds | 0.96785 | −0.0003 |
+| blend_top4 (wide_2hop + rich_2hop + wide + rich_hl14) | 0.96686 | −0.0013 |
+| wide_2hop, half-life 21 | 0.96670 | −0.0014 |
+
+Leaderboard top at this point: **0.97012** (gap 0.0020).
+
+**Implications.**
+1. **Seed variance is settled.** 30 vs 10 seeds moves the public score by 0.0003, as predicted
+   (§25: within ±0.001). The 10-seed result was not a lucky draw.
+2. **The recency setting is near its best.** Half-life 21 is 0.0014 lower. That is consistent
+   with recency mattering (§14, §17), but too small to justify any further tuning of the
+   half-life on the public LB.
+3. **The 4-model blend is the best blend so far** (0.96686, vs 0.96587 for the 3-model blend).
+   It sits within 0.0013 of the best single model, which meets the §23 criterion (within
+   ~0.002) for the steady second pick.
+4. **No round-7 file beat the round-6 best.** Six of the last seven submissions lie in
+   0.9659–0.9681, a 0.0022 band smaller than one public SE (0.0077). The model family has
+   converged; what remains is noise in which rows happen to be public.
+
+**Final private-leaderboard picks:**
+
+| Pick | File | Public | Why |
+|---|---|---|---|
+| 1 (performance) | `submission_nbr_stack_wide_2hop_hl14.csv` | 0.96814 | best public; reproduced exactly by `e1304439.ipynb` |
+| 2 (steady) | `submission_blend_top4.csv` | 0.96686 | averages four graph configurations; within 0.0013 of pick 1; test rank ρ 0.990 with pick 1 |
+
+Grade proxy if private scores track public ones: 10 × (0.96814/0.97012)^5 = **9.90 / 10**.
+
+**Room for further improvement** (assessed 2026-10-17):
+- **Only one untested idea has a clear mechanism:** iterative (collective) classification.
+  Recompute the neighbour and two-hop context from *stage-2* scores, which are more accurate
+  than stage-1, and fit a third stage (Lu & Getoor 2003). It reuses the one-hop/two-hop reach
+  that worked, unlike 3-hop propagation (§23), which averaged over larger, noisier
+  neighbourhoods. Expected effect: +0.000 to +0.003, uncertain.
+- **Rule if tried:** one pre-registered submission; adopt only at ≥ +0.003 over 0.96814
+  (about 2 paired SE). Otherwise keep the picks above. This bounds the selection-bias risk to
+  a single comparison.
+- **Everything else** (more seeds, half-life, more feature statistics, more blends) has been
+  shown to move the public score by ≤ 0.0015, i.e. within noise.
