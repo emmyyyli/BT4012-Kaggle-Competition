@@ -1280,4 +1280,50 @@ Local check (2 seeds):
 
 | File | Public AUC |
 |---|---|
-| `submission_nbr_stack_wide_2hop_hl14_iter.csv` | _pending_ |
+| `submission_nbr_stack_wide_2hop_hl14_iter.csv` | **0.96698** (2026-10-17) |
+
+## 29. Round 8 result and the noise floor (2026-10-17)
+
+The extra round scored **0.96698**, −0.0012 vs pick 1 (0.96814). Under the pre-registered
+rule (≥ 0.97114) it is **not adopted**. Picks stay as in §27.
+
+**Is it actually worse? Not demonstrably.** Paired comparisons with pick 1 (same public rows):
+
+| Comparison | Δ public | Test rank ρ | Paired SE (proxy) | z |
+|---|---|---|---|---|
+| extra round vs pick 1 | −0.0012 | 0.9935 | 0.0009 | −1.3 |
+| **30 seeds vs 10 seeds (same model)** | −0.0003 | 0.9997 | 0.0002 | **−1.5** |
+| half-life 21 vs 14 | −0.0014 | 0.9977 | 0.0005 | −2.8 |
+| blend_top4 vs pick 1 | −0.0013 | 0.9902 | 0.0011 | −1.2 |
+
+- **The 30-seed row calibrates the noise.** Averaging more seeds cannot make the model worse
+  in expectation, yet it shows z = −1.5. So the rank-correlation proxy *understates* the
+  paired noise, and the z-values above are inflated. Even −2.8 for half-life 21 is weak
+  evidence.
+- **Pick 1 is partly selected on public luck.** The last nine graph-model submissions span
+  only 0.0047 (sd 0.0014). The highest of them (pick 1) likely includes a small favourable
+  draw on the public rows, of order 0.001, which the private LB will not repeat. The same
+  holds for every top entry on the leaderboard.
+- **Local evidence again failed to predict Kaggle.** The extra round was better on the long
+  windows (+0.005/+0.011) and flat on the short ones. Its public score was flat-to-lower,
+  consistent with the short windows, which have now matched or bounded Kaggle in every round.
+
+**Conclusion.** The graph-stacking family has converged at a public AUC of about 0.966–0.968.
+Changes to its rounds, reach, seeds, recency or blending move the score by less than the
+public-LB noise. Improvement beyond this would need *new information* about the test period,
+not re-processing of existing information.
+
+## 30. Remaining options, assessed (2026-10-17)
+
+| Option | Mechanism | Expected Δ public | Risk | Verdict |
+|---|---|---|---|---|
+| **Stop; keep picks (§27)** | — | 0 | none | **recommended** |
+| Directional two-hop paths (in→in "fan-in/consolidation" vs out→out "fan-out/peel chains") | separates laundering flow shapes that undirected walks mix | +0.000 to +0.002 | low; one file | optional, only if time is spare |
+| Stage-2 regularisation re-tune (stage 2 has ~300 features but reuses stage-1 settings) | fewer columns per tree / stronger L2 for the wider input | ±0.002 | tuned on saturated short windows, so likely noise | not recommended |
+| Validation that masks labels inside the validation window to imitate the test regime | a local proxy that could rank graph variants correctly | none directly; enables future tuning | 1–2 days of work | a good point for the report's "future work", not for this deadline |
+| More rounds / hops / seeds / blends / half-lives | already shown to move ≤ 0.0015 | ≈ 0 | adds selection bias | not recommended |
+| External data (e.g. Elliptic++ wallet features) | new information | possibly large | likely against the competition rules | not allowed unless rules permit |
+
+The grade sensitivity is small. At (AUC/best)^5, each 0.001 of private AUC is worth about
+0.05 of 10 ranking points. The remaining 5 report points and the code/reproducibility component
+are better uses of the last week.
