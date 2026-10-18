@@ -143,3 +143,34 @@ def test_directional_two_hop_separates_payment_patterns():
     assert out.loc["c", "dir2_bwd_walks"] == 2  # a and d are grandparents of c
     assert out.loc["c", "dir2_cofunded_walks"] == 1  # e is c's sibling via b
     assert out.loc["c", "dir2_cofunded_score_mean"] == pytest.approx(0.7)
+
+
+def test_forward_oof_scores_each_block_from_earlier_steps_only(monkeypatch):
+    import src.graph_stacking as gs
+
+    columns = ["feat_1", "feat_2", *gs.RICH_NEIGHBOUR_FEATURES]
+    train = _frame(np.repeat(np.arange(1, 11), 30), 0)
+    target = _frame(np.repeat([11, 12], 20), 1)
+    for frame in (train, target):
+        for column in gs.RICH_NEIGHBOUR_FEATURES:
+            frame[column] = np.arange(len(frame), dtype=float)
+    ids = [*train["txId"], *target["txId"]]
+    graph = build_graph(pd.DataFrame({"txId1": ids[:-1], "txId2": ids[1:]}))
+
+    fitted_steps = []
+    real_fit = gs._fit
+
+    def recording_fit(frame, cols, seed, weights=None):
+        fitted_steps.append(sorted(frame["time_step"].unique()))
+        return real_fit(frame, cols, seed, weights)
+
+    monkeypatch.setattr(gs, "_fit", recording_fit)
+    scores = gs.make_neighbour_stack(half_life_steps=14, rich=True, forward_oof=True)(train, target, columns, 0, graph)
+
+    # Blocks of steps 1-2, 3-4, ..., 9-10. Block 1 has no past and keeps the ordinary
+    # out-of-fold model; later blocks see only earlier steps. Then a full stage-1 model scores
+    # the target rows, and stage 2 is fitted on every training row.
+    assert [max(steps) for steps in fitted_steps] == [10, 2, 4, 6, 8, 10, 10]
+    assert 1 not in fitted_steps[0] and 2 not in fitted_steps[0]
+    assert scores.shape == (len(target),)
+    assert np.all((scores >= 0) & (scores <= 1))

@@ -242,7 +242,9 @@ def propagation_features(graph, frame, scores, hops=3, decay=0.5):
     )
 
 
-def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False):
+def make_neighbour_stack(
+    half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False, forward_oof=False
+):
     """Two-stage stacking over labeled neighbours.
 
     ``half_life_steps``: recency weights in every stage (relative to the last training step).
@@ -258,6 +260,12 @@ def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=F
     ``extra_rounds``: iterative (collective) classification. Before the final stage, repeat
     this many times: score every row out-of-fold with a model that uses the current graph
     context, then rebuild the context from those (more accurate) scores. 0 = plain two-stage.
+    ``forward_oof``: score each time block of training rows with a model fitted only on earlier
+    steps (the first block, which has no past, keeps its ordinary out-of-fold scores), and score
+    target rows with a model fitted on all training rows. Ordinary out-of-fold models also see
+    later steps, so training-row neighbour scores are far more accurate than the forward-only
+    scores target rows get (AUC 0.997 vs 0.985 on steps 8-35, report/findings.md section 32);
+    this option gives stage 2 neighbour scores of the quality it will meet at prediction time.
     """
     def fit(frame, columns, seed, reference_step):
         weights = None if half_life_steps is None else _recency_weights(frame["time_step"], reference_step, half_life_steps)
@@ -267,12 +275,15 @@ def make_neighbour_stack(half_life_steps=None, rich=False, wide=False, two_hop=F
         """Out-of-fold scores for ``train`` (folds = blocks of time steps) + fold models' target scores."""
         oof = np.full(len(train), np.nan)
         fold_target_scores = []
-        for fold_steps in np.array_split(np.sort(train["time_step"].unique()), STACK_FOLDS):
+        for block, fold_steps in enumerate(np.array_split(np.sort(train["time_step"].unique()), STACK_FOLDS)):
             held = train["time_step"].isin(fold_steps).to_numpy()
-            model = fit(train.loc[~held], columns, seed, reference)
+            fit_rows = (train["time_step"] < fold_steps[0]).to_numpy() if forward_oof and block > 0 else ~held
+            model = fit(train.loc[fit_rows], columns, seed, reference)
             oof[held] = model.predict_proba(train.loc[held, columns])[:, 1]
-            if score_target:
+            if score_target and not forward_oof:
                 fold_target_scores.append(model.predict_proba(target[columns])[:, 1])
+        if score_target and forward_oof:
+            fold_target_scores.append(fit(train, columns, seed, reference).predict_proba(target[columns])[:, 1])
         return oof, fold_target_scores
 
     def graph_context(train, target, scores, graph):

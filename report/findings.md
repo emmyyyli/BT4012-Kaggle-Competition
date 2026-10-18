@@ -1358,4 +1358,79 @@ behaviour is unchanged (byte-identical check). Unit-tested on a hand-built graph
 
 | File | Public AUC |
 |---|---|
-| `submission_nbr_stack_wide_2hop_dir_hl14.csv` | _pending_ |
+| `submission_nbr_stack_wide_2hop_dir_hl14.csv` | **0.96787** (2026-10-17) |
+
+**Result:** −0.0003 vs pick 1, inside the predicted ±0.001 band. Not adopted; picks stay as in §27.
+
+## 32. Round 10: forward-only stage-1 scores (2026-10-17)
+
+**Diagnosis.** Stage 2 learns from neighbour scores of training rows, which are out-of-fold
+scores from models fitted on *all other* time blocks, including later ones. Target rows are
+only ever scored by models fitted on earlier steps. Measured on the same rows (steps 8–35,
+seed 0, half-life 14): out-of-fold AUC **0.9974** vs forward-only AUC **0.9853**, about 5–6×
+more ranking errors. Every labeled neighbour of a test row is another test row, so all
+test-period neighbour scores are of the weaker, forward-only kind. Stage 2 is therefore
+trained to trust neighbour scores more than it should at prediction time. This is consistent
+with §14 (neighbour scores 22.5% of training gain but 7% of test SHAP) and §17.1 (score-free
+neighbour feature means transfer best).
+
+**Code:** `graph_stacking.make_neighbour_stack(..., forward_oof=True)`. Each time block after the
+first is scored by a model fitted only on earlier steps. The first block (no past) keeps its
+ordinary out-of-fold scores. Target rows are scored by a stage-1 model fitted on all training
+rows. Default behaviour is unchanged (byte-identical seed-0 window check). Test:
+`test_forward_oof_scores_each_block_from_earlier_steps_only`. Variant:
+`nbr_stack_wide_2hop_hl14_fwd` = pick 1 + this change. Tables: `artifacts/round3/round10_*.csv`.
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean |
+|---|---|---|---|---|---|---|
+| wide_2hop (pick 1, public 0.96814) | 0.8798 | 0.9359 | 0.8620 | **0.9970** | **0.9982** | 0.9346 |
+| **+ forward-only stage-1 scores** | **0.8881** | **0.9368** | **0.8624** | 0.9968 | 0.9979 | **0.9364** |
+
+- Flat on the Kaggle-aligned short windows (−0.0002 / −0.0003, inside seed noise) and +0.008
+  on the longest window. Validation rows in these windows are already scored forward-only, so
+  the windows reproduce the test-time mismatch; they show the fix neither helps nor hurts the
+  short horizon measurably.
+- Test rank correlation with pick 1 is **0.987**, the largest change since round 6, so the
+  public score may move more than the last few variants did.
+
+**Pre-registered rule:** adopt as pick 1 only if public AUC ≥ **0.97114** (0.96814 + 0.003).
+Otherwise picks stay as in §27.
+
+| File | Public AUC |
+|---|---|
+| `submission_nbr_stack_wide_2hop_hl14_fwd.csv` | **0.96503** (2026-10-18) |
+
+## 33. Round 10 result: matching neighbour-score quality hurts (2026-10-18)
+
+The forward-only variant scored **0.96503**, −0.0031 vs pick 1 (0.96814). Not adopted; picks
+stay as in §27.
+
+**Is it really worse?** Probably. With rank ρ 0.987 the proxy paired SE is about 0.0012
+(z ≈ −2.6). §29 showed that proxy understates the noise by roughly 2×, which still leaves
+z ≈ −1.3 to −2. It is the largest drop of any graph variant except 3-hop propagation (§23),
+and it lies outside the 0.9659–0.9681 band of the last nine graph submissions.
+
+**What it says about the assumptions.**
+1. **The diagnosis was right, the remedy was wrong.** Training-row neighbour scores *are* much
+   more accurate than test-row ones (0.997 vs 0.985). But giving stage 2 noisier scores to
+   train on made it worse at test, not better. A plausible reason: accurate out-of-fold
+   scores act as a clean proxy for the neighbours' labels, so stage 2 learns the true strength
+   of homophily (illicit neighbours → illicit). Noisier scores teach a weaker dependence, and
+   for a ranking metric under-using a still-informative neighbour signal costs more than
+   over-trusting it.
+2. **The forward models were also weaker than the test-time model.** Block 2 (steps 8–14) was
+   scored by a model trained on steps 1–7 only, whereas test rows are scored by a model
+   trained on all 35 steps. Matching the *horizon* mismatched the *training-set size* in the
+   other direction.
+3. **Confound:** the variant also changed how target rows are scored (one full stage-1 model
+   instead of the mean of the five fold models, §16 C). That alone could account for part of
+   the drop. Not worth a submission to separate: either way the variant is not adopted.
+4. **Refined design principle for the report:** graph features must be *defined* identically
+   at training and prediction time (same neighbourhood rule, §17.1) — that is what made graph
+   context work. Matching the *noise level* of the stacked scores is not required and, here,
+   is harmful.
+5. **Local windows behaved as before:** flat on the Kaggle-aligned short windows (−0.0002 /
+   −0.0003), better on the longest window (+0.008), lower on Kaggle. Long-window gains have
+   now failed to transfer five times (§6, §23, §29, here); short windows bounded the result
+   but did not predict its size.
+
