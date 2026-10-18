@@ -1434,3 +1434,47 @@ and it lies outside the 0.9659–0.9681 band of the last nine graph submissions.
    now failed to transfer five times (§6, §23, §29, here); short windows bounded the result
    but did not predict its size.
 
+
+## 34. Round 11: hub-weighted means, peel-chain shape, centrality (2026-10-18)
+
+**Code:** `src/graph_stacking.py`: `hub_weighted_features` (option `hub`), `chain_features`
+(`chain`), `centrality_features` (`centrality`). Variants = pick 1 + one option each. Default
+behaviour unchanged (byte-identical seed-0 window check). Tests: 4 new, 45 pass. Tables:
+`artifacts/round3/round11_*.csv`.
+
+- **hub:** neighbour means where each neighbour counts 1/degree. One hop: stage-1 score and the
+  25 wide features. Two hops: paths a–b–c weighted by 1/deg(b), so a hub in the middle no longer
+  contributes hundreds of endpoints.
+- **chain** (label-free, full edge list): longest directed path into/out of the transaction;
+  peel-like flag (one funder, ≤ 2 spenders); length of the unbroken peel run before/after it.
+- **cent** (label-free): PageRank along and against the payment direction, two-hop reach,
+  mean/max neighbour degree, triangle count.
+
+**Structural fact found while building:** the graph has exactly **49 connected components, one
+per time step** (no component spans two steps). Component-level counts would therefore encode
+the time step and were not used. Raw PageRank shrinks with component size, so it is rescaled to
+mean one within each component. The directed graph is confirmed acyclic.
+
+Label-free feature check on labeled training rows: univariate AUC up to 0.64 (peel run) and
+0.61 (backward PageRank); drift into the test period ≤ 0.31 IQR (degree-based features
+highest), below the 0.44 mean of the supplied aggregated features.
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean | seed sd | test ρ vs pick 1 |
+|---|---|---|---|---|---|---|---|---|
+| wide_2hop (pick 1, 0.96814) | 0.8798 | 0.9359 | 0.8620 | 0.9970 | 0.9982 | 0.9346 | 0.0023 | — |
+| + hub | 0.8823 | 0.9347 | 0.8616 | 0.9970 | 0.9980 | 0.9347 | 0.0006 | 0.9968 |
+| + chain | 0.8830 | 0.9344 | 0.8550 | 0.9968 | 0.9982 | 0.9335 | 0.0020 | 0.9982 |
+| + cent | 0.8759 | 0.9279 | 0.8443 | 0.9969 | 0.9982 | 0.9286 | 0.0015 | 0.9970 |
+
+All three are flat on the Kaggle-aligned short windows (within 0.0002). cent loses most on the
+long windows (−0.018 on ≤21→22–35), the usual pattern for extra graph context. Rank
+correlations with pick 1 of 0.997–0.998 are as close as round 9 (0.9983, public −0.0003), so
+expected public moves are of order ±0.001–0.002.
+
+**Pre-registered rule (each file):** adopt as pick 1 only if public AUC ≥ **0.97114**.
+
+| File | Public AUC |
+|---|---|
+| `submission_nbr_stack_wide_2hop_hub_hl14.csv` | _pending_ |
+| `submission_nbr_stack_wide_2hop_chain_hl14.csv` | _pending_ |
+| `submission_nbr_stack_wide_2hop_cent_hl14.csv` | _pending_ |

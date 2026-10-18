@@ -12,6 +12,7 @@ nodes, computes every graph feature the same way at training and prediction time
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
+import scipy.sparse.csgraph  # noqa: F401  (registers sp.csgraph)
 
 from src.model_zoo import TUNED_LGBM_PARAMS, lgbm_factory
 
@@ -242,8 +243,173 @@ def propagation_features(graph, frame, scores, hops=3, decay=0.5):
     )
 
 
+def hub_weighted_features(graph, frame, scores, wide_features=WIDE_NEIGHBOUR_FEATURES, hop2_features=RICH_NEIGHBOUR_FEATURES):
+    """Neighbour means in which high-degree (hub) transactions count less.
+
+    One hop: mean over labeled neighbours v weighted by 1/deg(v), of the stage-1 score and the
+    25 wide features. Two hops: paths a - b - c weighted by 1/deg(b), so a hub in the middle
+    (e.g. a sweep transaction with hundreds of links) no longer contributes hundreds of
+    endpoints; the walk back to the node itself is excluded. Degrees count every edge in the
+    edge list, including edges to featureless nodes.
+    """
+    nodes, adjacency = _undirected_adjacency(graph)
+    degree = np.asarray(adjacency.sum(axis=1)).ravel()
+    inverse = np.divide(1.0, degree, out=np.zeros_like(degree), where=degree > 0)
+    position = nodes.get_indexer(frame["txId"])
+    present = position >= 0
+    index = np.clip(position, 0, None)
+    mask = np.zeros(len(nodes))
+    mask[position[present]] = 1.0
+    self_return = adjacency @ inverse  # sum over b of 1/deg(b): weight of the paths a - b - a
+
+    def one_hop(x):
+        return adjacency @ (inverse * x)
+
+    def two_hop(x):
+        return adjacency @ (inverse * (adjacency @ x)) - self_return * x
+
+    columns = {"score": scores.reindex(frame["txId"]).to_numpy()}
+    for feature in dict.fromkeys([*wide_features, *hop2_features]):
+        columns[feature] = frame[feature].to_numpy()
+    one_hop_names = ["score", *wide_features]
+    two_hop_names = ["score", *hop2_features]
+    counts = {"hub1": one_hop(mask), "hub2": two_hop(mask)}
+    out = {}
+    for prefix, walk, names in (("hub1", one_hop, one_hop_names), ("hub2", two_hop, two_hop_names)):
+        for name in names:
+            vector = np.zeros(len(nodes))
+            vector[position[present]] = columns[name][present]
+            with np.errstate(invalid="ignore", divide="ignore"):
+                mean = np.where(counts[prefix] > 1e-12, walk(vector) / counts[prefix], np.nan)
+            out[f"{prefix}_mean_{name}"] = np.where(present, mean[index], np.nan)
+    return pd.DataFrame(out, index=frame["txId"])
+
+
+_STRUCTURE_CACHE = {}
+
+
+def _components(graph):
+    nodes, adjacency = _undirected_adjacency(graph)
+    _, labels = sp.csgraph.connected_components(adjacency, directed=False)
+    return labels
+
+
+def _longest_paths(directed):
+    """Longest directed path ending at (``up``) and starting from (``down``) each node of a DAG."""
+    n = directed.shape[0]
+    transpose = directed.T.tocsr()
+    in_degree = np.diff(transpose.indptr).copy()
+    order, frontier = [], list(np.flatnonzero(in_degree == 0))
+    while frontier:  # Kahn's algorithm; the payment graph has no cycles
+        node = frontier.pop()
+        order.append(node)
+        for child in directed.indices[directed.indptr[node]:directed.indptr[node + 1]]:
+            in_degree[child] -= 1
+            if in_degree[child] == 0:
+                frontier.append(child)
+    if len(order) != n:
+        raise ValueError("graph has a cycle")
+    up, down = np.zeros(n), np.zeros(n)
+    for node in order:
+        parents = transpose.indices[transpose.indptr[node]:transpose.indptr[node + 1]]
+        if len(parents):
+            up[node] = up[parents].max() + 1
+    for node in reversed(order):
+        children = directed.indices[directed.indptr[node]:directed.indptr[node + 1]]
+        if len(children):
+            down[node] = down[children].max() + 1
+    return np.asarray(order), up, down
+
+
+def chain_features(graph, ids):
+    """Label-free payment-chain shape for each id, from the full edge list.
+
+    * ``depth_up`` / ``depth_down``: longest directed path into / out of the transaction;
+    * ``peel_like``: one funding transaction and at most two spenders (pay one party, keep the
+      change), the building block of a peeling chain;
+    * ``peel_run_up`` / ``peel_run_down``: length of the unbroken run of peel-like transactions
+      leading into / out of this one (0 when the transaction itself is not peel-like).
+    Every node of the edge list takes part (featureless ones included), and the edge list is
+    complete in both periods, so the features mean the same at training and prediction time.
+    Component sizes are deliberately not used: each time step is exactly one component, so
+    they would encode the time step.
+    """
+    key = ("chain", id(graph))
+    if key not in _STRUCTURE_CACHE:
+        nodes, directed = _directed_adjacency(graph)
+        out_degree = np.diff(directed.indptr)
+        in_degree = np.diff(directed.T.tocsr().indptr)
+        order, up, down = _longest_paths(directed)
+        transpose = directed.T.tocsr()
+        peel = (in_degree == 1) & (out_degree <= 2)
+        run_up, run_down = np.zeros(len(nodes)), np.zeros(len(nodes))
+        for node in order:
+            if peel[node]:
+                parents = transpose.indices[transpose.indptr[node]:transpose.indptr[node + 1]]
+                run_up[node] = 1 + (run_up[parents].max() if len(parents) else 0)
+        for node in order[::-1]:
+            if peel[node]:
+                children = directed.indices[directed.indptr[node]:directed.indptr[node + 1]]
+                run_down[node] = 1 + (run_down[children].max() if len(children) else 0)
+        _STRUCTURE_CACHE[key] = pd.DataFrame(
+            {"depth_up": up, "depth_down": down, "peel_like": peel.astype(float), "peel_run_up": run_up, "peel_run_down": run_down},
+            index=nodes,
+        )
+    return _STRUCTURE_CACHE[key].reindex(pd.Index(ids))
+
+
+def _pagerank(matrix, damping=0.85, iterations=100, tol=1e-10):
+    """PageRank over ``matrix`` (row = source); dangling mass is spread uniformly."""
+    n = matrix.shape[0]
+    out_degree = np.asarray(matrix.sum(axis=1)).ravel()
+    inverse = np.divide(1.0, out_degree, out=np.zeros_like(out_degree), where=out_degree > 0)
+    transition_t = (sp.diags(inverse) @ matrix).T.tocsr()
+    rank = np.full(n, 1.0 / n)
+    for _ in range(iterations):
+        dangling = rank[out_degree == 0].sum()
+        new = damping * (transition_t @ rank + dangling / n) + (1 - damping) / n
+        if np.abs(new - rank).sum() < tol:
+            return new
+        rank = new
+    return rank
+
+
+def centrality_features(graph, ids):
+    """Label-free centrality for each id, from the full edge list.
+
+    * ``pagerank_fwd``: PageRank along the payment direction (where funds accumulate);
+      ``pagerank_bwd``: against it (where funds originate). Each is rescaled to mean one within
+      its connected component, because each time step is one component and raw PageRank
+      shrinks with component size (it would otherwise encode the time step);
+    * ``reach2``: distinct transactions within two hops (undirected);
+    * ``nbr_degree_mean`` / ``nbr_degree_max``: degree of direct neighbours, featureless included;
+    * ``triangles``: number of triangles through the node (undirected), e.g. a -> b -> c with a -> c.
+    """
+    key = ("centrality", id(graph))
+    if key not in _STRUCTURE_CACHE:
+        nodes, adjacency = _undirected_adjacency(graph)
+        _, directed = _directed_adjacency(graph)
+        labels = _components(graph)
+        degree = np.asarray(adjacency.sum(axis=1)).ravel()
+        features = {}
+        for name, matrix in (("pagerank_fwd", directed), ("pagerank_bwd", directed.T.tocsr())):
+            rank = _pagerank(matrix)
+            component_mean = np.bincount(labels, weights=rank) / np.bincount(labels)
+            features[name] = rank / component_mean[labels]
+        two_step = adjacency @ adjacency
+        reach = ((two_step + adjacency) > 0).astype(float)
+        features["reach2"] = np.asarray(reach.sum(axis=1)).ravel() - (reach.diagonal() > 0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            features["nbr_degree_mean"] = np.where(degree > 0, (adjacency @ degree) / degree, np.nan)
+        features["nbr_degree_max"] = np.asarray(adjacency.multiply(degree[None, :]).max(axis=1).todense()).ravel()
+        features["triangles"] = np.asarray(two_step.multiply(adjacency).sum(axis=1)).ravel() / 2
+        _STRUCTURE_CACHE[key] = pd.DataFrame(features, index=nodes)
+    return _STRUCTURE_CACHE[key].reindex(pd.Index(ids))
+
+
 def make_neighbour_stack(
-    half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False, forward_oof=False
+    half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False, forward_oof=False,
+    hub=False, chain=False, centrality=False,
 ):
     """Two-stage stacking over labeled neighbours.
 
@@ -266,6 +432,10 @@ def make_neighbour_stack(
     later steps, so training-row neighbour scores are far more accurate than the forward-only
     scores target rows get (AUC 0.997 vs 0.985 on steps 8-35, report/findings.md section 32);
     this option gives stage 2 neighbour scores of the quality it will meet at prediction time.
+    ``hub``: add neighbour means down-weighted by degree (``hub_weighted_features``).
+    ``chain``: add label-free payment-chain shape (``chain_features``).
+    ``centrality``: add label-free PageRank, two-hop reach and neighbour degree
+    (``centrality_features``).
     """
     def fit(frame, columns, seed, reference_step):
         weights = None if half_life_steps is None else _recency_weights(frame["time_step"], reference_step, half_life_steps)
@@ -300,6 +470,12 @@ def make_neighbour_stack(
                 neighbour = neighbour.join(propagation_features(graph, both, scores))
             if directional:
                 neighbour = neighbour.join(directional_two_hop_features(graph, both, scores))
+            if hub:
+                neighbour = neighbour.join(hub_weighted_features(graph, both, scores))
+            if chain:
+                neighbour = neighbour.join(chain_features(graph, both["txId"]).set_axis(both["txId"]))
+            if centrality:
+                neighbour = neighbour.join(centrality_features(graph, both["txId"]).set_axis(both["txId"]))
         return neighbour
 
     def with_context(train, target, columns, neighbour):

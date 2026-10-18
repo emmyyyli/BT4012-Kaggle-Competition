@@ -7,6 +7,9 @@ and is then judged on the Kaggle public leaderboard. Variants:
 ``recent_K``      train only on the last K labeled time steps before the cut-off
 ``halflife_H``    exponential recency weights with half-life H steps (mean-one weights)
 ``temporal_bag``  rank-average of models trained on all steps, the last 25 and the last 15
+``nbr_stack_wide_2hop_hub_hl14`` / ``_chain_`` / ``_cent_``
+                  round-11: pick 1 + degree-down-weighted neighbour means; + peel-chain
+                  shape; + PageRank / reach / neighbour-degree centrality
 ``nbr_stack_wide_2hop_hl14_fwd``
                   round-10: stage-1 neighbour scores for training rows come from models fitted
                   on earlier steps only, matching how target rows are scored
@@ -116,6 +119,10 @@ def variants():
     registry["nbr_stack_wide_2hop_dir_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, wide=True, two_hop=True, directional=True)
     registry["nbr_stack_wide_2hop_hl14_iter"] = make_neighbour_stack(half_life_steps=14, rich=True, wide=True, two_hop=True, extra_rounds=1)
     registry["nbr_stack_wide_2hop_hl14_fwd"] = make_neighbour_stack(half_life_steps=14, rich=True, wide=True, two_hop=True, forward_oof=True)
+    pick1 = dict(half_life_steps=14, rich=True, wide=True, two_hop=True)
+    registry["nbr_stack_wide_2hop_hub_hl14"] = make_neighbour_stack(**pick1, hub=True)
+    registry["nbr_stack_wide_2hop_chain_hl14"] = make_neighbour_stack(**pick1, chain=True)
+    registry["nbr_stack_wide_2hop_cent_hl14"] = make_neighbour_stack(**pick1, centrality=True)
     registry["nbr_stack_rich_2hop_prop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, propagate=True)
     return registry
 

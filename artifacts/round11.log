@@ -1,0 +1,18 @@
+  t14_v15-35
+  t21_v22-35
+  t21_v22-28
+  t25_v26-35
+  t28_v29-35
+window                          t14_v15-35  t21_v22-28  t21_v22-35  t25_v26-35  t28_v29-35    mean
+candidate                                                                                         
+tuned_lgbm_all                      0.8991      0.9587      0.9117      0.9953      0.9960  0.9522
+nbr_stack_wide_2hop_hub_hl14        0.8823      0.9347      0.8616      0.9970      0.9980  0.9347
+nbr_stack_wide_2hop_hl14            0.8798      0.9359      0.8620      0.9970      0.9982  0.9346
+nbr_stack_wide_2hop_chain_hl14      0.8830      0.9344      0.8550      0.9968      0.9982  0.9335
+nbr_stack_wide_2hop_cent_hl14       0.8759      0.9279      0.8443      0.9969      0.9982  0.9286
+                     candidate  mean_roc_auc  worst_roc_auc  mean_delta_vs_baseline  min_window_delta  windows_improved  windows  mean_seed_auc_std  adopt
+                tuned_lgbm_all        0.9522         0.8991                  0.0000            0.0000                 0        5             0.0019  False
+  nbr_stack_wide_2hop_hub_hl14        0.9347         0.8616                 -0.0175           -0.0502                 2        5             0.0006  False
+      nbr_stack_wide_2hop_hl14        0.9346         0.8620                 -0.0176           -0.0498                 2        5             0.0023  False
+nbr_stack_wide_2hop_chain_hl14        0.9335         0.8550                 -0.0187           -0.0567                 2        5             0.0020  False
+ nbr_stack_wide_2hop_cent_hl14        0.9286         0.8443                 -0.0235           -0.0674                 2        5             0.0015  False

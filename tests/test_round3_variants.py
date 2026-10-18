@@ -174,3 +174,70 @@ def test_forward_oof_scores_each_block_from_earlier_steps_only(monkeypatch):
     assert 1 not in fitted_steps[0] and 2 not in fitted_steps[0]
     assert scores.shape == (len(target),)
     assert np.all((scores >= 0) & (scores <= 1))
+
+
+def test_hub_weighting_down_weights_high_degree_middle_nodes():
+    from src.graph_stacking import hub_weighted_features
+
+    # a - h - {c, x1, x2} and a - b - d: h is a hub (degree 4), b has degree 2. x1/x2 are featureless.
+    edges = pd.DataFrame({"txId1": ["a", "h", "h", "h", "a", "b"], "txId2": ["h", "c", "x1", "x2", "b", "d"]})
+    frame = pd.DataFrame({"txId": ["a", "h", "b", "c", "d"], "feat_1": [0.0, 0.0, 0.0, 1.0, 3.0]})
+    scores = pd.Series({"a": 0.0, "h": 0.4, "b": 0.8, "c": 0.0, "d": 1.0})
+    out = hub_weighted_features(build_graph(edges), frame, scores, wide_features=["feat_1"], hop2_features=["feat_1"])
+
+    # one hop from a: h (weight 1/4) and b (weight 1/2) -> (0.4/4 + 0.8/2) / (1/4 + 1/2)
+    assert out.loc["a", "hub1_mean_score"] == pytest.approx((0.1 + 0.4) / 0.75)
+    # two hops from a: c through h (weight 1/4), d through b (weight 1/2) -> (1/4 * 1 + 1/2 * 3) / (3/4)
+    assert out.loc["a", "hub2_mean_feat_1"] == pytest.approx((0.25 + 1.5) / 0.75)
+    assert out.loc["a", "hub2_mean_score"] == pytest.approx((0.25 * 0.0 + 0.5 * 1.0) / 0.75)
+
+
+def test_chain_features_measure_depth_and_peel_runs():
+    from src.graph_stacking import chain_features
+
+    # s -> p1 -> p2 -> p3 -> {e1, e2, e3}: p1..p2 are peel-like (one parent, <= 2 children);
+    # p3 has 3 children, so it is not.
+    edges = pd.DataFrame({"txId1": ["s", "p1", "p2", "p3", "p3", "p3"], "txId2": ["p1", "p2", "p3", "e1", "e2", "e3"]})
+    out = chain_features(build_graph(edges), ["s", "p1", "p2", "p3", "e1"])
+
+    assert out["depth_up"].tolist() == [0, 1, 2, 3, 4]
+    assert out["depth_down"].tolist() == [4, 3, 2, 1, 0]
+    assert out["peel_like"].tolist() == [0, 1, 1, 0, 1]
+    assert out.loc["p2", "peel_run_up"] == 2 and out.loc["p1", "peel_run_down"] == 2
+    assert out.loc["p3", "peel_run_up"] == 0
+
+
+def test_centrality_is_rescaled_within_components_and_counts_reach():
+    from src.graph_stacking import centrality_features
+
+    # Two components of different sizes: a star (hub -> 3 leaves) and a pair.
+    edges = pd.DataFrame({"txId1": ["h", "h", "h", "p"], "txId2": ["l1", "l2", "l3", "q"]})
+    graph = build_graph(edges)
+    out = centrality_features(graph, ["h", "l1", "l2", "l3", "p", "q"])
+
+    for members in (["h", "l1", "l2", "l3"], ["p", "q"]):
+        assert out.loc[members, "pagerank_fwd"].mean() == pytest.approx(1.0)
+    assert out.loc["l1", "pagerank_fwd"] > out.loc["h", "pagerank_fwd"]  # funds accumulate downstream
+    assert out.loc["l1", "reach2"] == 3  # h, l2, l3
+    assert out.loc["h", "nbr_degree_mean"] == pytest.approx(1.0)
+    assert out.loc["l1", "nbr_degree_max"] == 3
+    assert out["triangles"].sum() == 0
+
+
+def test_round11_variants_run_end_to_end():
+    from src.graph_stacking import RICH_NEIGHBOUR_FEATURES, WIDE_NEIGHBOUR_FEATURES, make_neighbour_stack
+
+    extra = list(dict.fromkeys([*RICH_NEIGHBOUR_FEATURES, *WIDE_NEIGHBOUR_FEATURES]))
+    columns = list(dict.fromkeys(["feat_1", "feat_2", *extra]))
+    train = _frame(np.repeat(np.arange(1, 11), 30), 0)
+    target = _frame(np.repeat([11, 12], 20), 1)
+    for frame in (train, target):
+        for column in extra:
+            if column not in ("feat_1", "feat_2"):
+                frame[column] = np.arange(len(frame), dtype=float)
+    ids = [*train["txId"], *target["txId"]]
+    graph = build_graph(pd.DataFrame({"txId1": ids[:-1], "txId2": ids[1:]}))
+    for option in ("hub", "chain", "centrality"):
+        scores = make_neighbour_stack(half_life_steps=14, rich=True, wide=True, two_hop=True, **{option: True})(train, target, columns, 0, graph)
+        assert scores.shape == (len(target),)
+        assert np.all((scores >= 0) & (scores <= 1))
