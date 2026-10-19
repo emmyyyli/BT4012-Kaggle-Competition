@@ -92,6 +92,7 @@ features. Every graph feature is therefore computed the same way in training and
 | `nbr_stack_wide_2hop_hl14_fwd` (forward-only stage-1 scores) | 0.96503 |
 | `nbr_stack_wide_2hop_hub_hl14` / `_cent_hl14` (hub-weighted means / centrality) | 0.96766 / 0.96759 |
 | `nbr_stack_wide_2hop_chain_hl14` (+ peel-chain shape, **final model**, private pick 1) | **0.96858** |
+| `nbr_stack_wide_2hop_chain_shift_hl14` (+ test-similarity importance weights; recommended private pick B) | **0.9702** |
 
 Full commentary for every round is in `report/findings.md`.
 

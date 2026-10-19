@@ -1596,4 +1596,49 @@ Otherwise picks stay as in §35.
 
 | File | Public AUC |
 |---|---|
-| `submission_nbr_stack_wide_2hop_chain_shift_hl14.csv` | _pending_ |
+| `submission_nbr_stack_wide_2hop_chain_shift_hl14.csv` | **0.9702** (2026-10-19; reported to 4 d.p.) |
+
+## 38. Round 12 result: shift weighting gives the best public score (2026-10-19)
+
+| Submission | Public | Δ vs chain (0.96858) | Test rank ρ vs chain | z (proxy SE 0.0013; calibrated ≈ 0.0027) |
+|---|---|---|---|---|
+| **chain + shift weights** | **0.9702** | **+0.0016** | 0.985 | +1.2 (≈ +0.6) |
+| chain (pick 1) | 0.96858 | — | — | — |
+| blend_top4 (pick 2) | 0.96686 | −0.0017 | 0.990 | — |
+
+Leaderboard top before this submission: 0.97012. 0.9702 is level with it (difference ≈ 0.0001,
+far inside one public SE of 0.0077).
+
+**What it shows.**
+1. **The best public score so far, but not a proven gain.** +0.0016 is below the pre-registered
+   +0.003 (≥ 0.97158) and about 0.6–1.2 paired SE. By the rule it is not adopted as a confirmed
+   improvement.
+2. **It is the first change since round 6 to move the score by more than ~0.0006 in the right
+   direction**, and it acts on the same axis as the only other repeatable driver: recency
+   weighting (+0.0065, +0.0047). Both shift training toward the test period; graph-shape
+   additions since round 6 (direction, hub, centrality, chain) all landed within ±0.0006. The
+   mechanism is therefore plausible, but one submission cannot separate it from noise.
+3. **Local windows again bounded but did not predict the result.** Short windows were flat
+   (−0.0002 / +0.0002), long windows lost ~0.01; Kaggle went up. Long windows have now failed to
+   predict the test set seven times; short windows have never contradicted the sign of a change
+   larger than ~0.003.
+4. **Variance caveat.** The combined weights keep an effective sample size of 43% (recency alone
+   77%), and the ranking moved more (ρ 0.985) than any variant since round 6, so this model
+   carries more fitting variance than the chain model.
+
+**Consequence for the private-leaderboard picks.** Kaggle scores the *better* of the two selected
+submissions on the private 70%, so pick 2 should be strong *and* fail differently from pick 1.
+The shift model beats blend_top4 on both counts: +0.0034 public, and more different from the
+chain model (ρ 0.985 vs 0.990). Recommended:
+
+| Pick | File | Public | Role |
+|---|---|---|---|
+| A | `submission_nbr_stack_wide_2hop_chain_hl14.csv` | 0.96858 | steadier configuration (no shift weights); notebook model |
+| B | `submission_nbr_stack_wide_2hop_chain_shift_hl14.csv` | 0.9702 | best public; adds test-similarity weighting |
+
+blend_top4 drops out. Which of A and B the notebook reproduces does not affect the private score
+(both are selected); the brief asks for the notebook of the top submission, which argues for
+switching the deliverable to B (§35 applied the same reasoning to a +0.0004 tie).
+
+Grade proxy if private tracks public and the leader stays at 0.97012: 10 × min(1, 0.9702/0.97012)^5
+= **10.0 / 10** (any lead or deficit of this size is noise).
