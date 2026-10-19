@@ -407,9 +407,53 @@ def centrality_features(graph, ids):
     return _STRUCTURE_CACHE[key].reindex(pd.Index(ids))
 
 
+_SHIFT_CACHE = {}
+
+
+def covariate_shift_weights(train, target, columns, drop_rounds=3, drop_per_round=10, power=0.5, clip=(0.2, 5.0)):
+    """Importance weights p(target | x) / p(train | x) for the rows of ``train`` (Series by txId).
+
+    An adversarial LightGBM separates training rows from target rows (5-fold out-of-fold, no
+    labels). With all supplied features the two periods separate perfectly through a few
+    time-trend features, which would make every weight ~0 and only repeat the recency weights.
+    So ``drop_rounds`` times the ``drop_per_round`` features with the largest adversarial gain
+    are removed first (report/findings.md section 37: AUC 1.000 -> 0.94 after 30 features,
+    weight-vs-step correlation 0.62 -> 0.37). The remaining odds are tempered by ``power``,
+    normalised to mean one, clipped to ``clip`` and renormalised. The removed features are
+    dropped only for the weights; the fraud classifier keeps all of them.
+    """
+    import lightgbm as lgb
+    from sklearn.model_selection import StratifiedKFold
+
+    key = (tuple(train["txId"]), tuple(target["txId"]), tuple(columns), drop_rounds, drop_per_round, power, clip)
+    if key in _SHIFT_CACHE:
+        return _SHIFT_CACHE[key]
+    features = pd.concat([train[list(columns)], target[list(columns)]], ignore_index=True)
+    is_target = np.r_[np.zeros(len(train)), np.ones(len(target))]
+    kept = list(columns)
+    for round_ in range(drop_rounds + 1):
+        oof, gain = np.zeros(len(features)), np.zeros(len(kept))
+        for fit_rows, held_rows in StratifiedKFold(5, shuffle=True, random_state=0).split(features, is_target):
+            model = lgb.LGBMClassifier(
+                n_estimators=200, num_leaves=15, learning_rate=0.05, colsample_bytree=0.5, min_child_samples=100,
+                random_state=0, verbose=-1,
+            ).fit(features.iloc[fit_rows][kept], is_target[fit_rows])
+            oof[held_rows] = model.predict_proba(features.iloc[held_rows][kept])[:, 1]
+            gain += model.booster_.feature_importance("gain")
+        if round_ < drop_rounds:
+            dropped = set(pd.Series(gain, index=kept).nlargest(min(drop_per_round, len(kept) - 1)).index)
+            kept = [column for column in kept if column not in dropped]
+    probability = np.clip(oof[: len(train)], 1e-6, 1 - 1e-6)
+    weights = (probability / (1 - probability)) ** power
+    weights = np.clip(weights / weights.mean(), *clip)
+    result = pd.Series(weights / weights.mean(), index=train["txId"].to_numpy())
+    _SHIFT_CACHE[key] = result
+    return result
+
+
 def make_neighbour_stack(
     half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False, forward_oof=False,
-    hub=False, chain=False, centrality=False,
+    hub=False, chain=False, centrality=False, shift_weights=False,
 ):
     """Two-stage stacking over labeled neighbours.
 
@@ -436,9 +480,18 @@ def make_neighbour_stack(
     ``chain``: add label-free payment-chain shape (``chain_features``).
     ``centrality``: add label-free PageRank, two-hop reach and neighbour degree
     (``centrality_features``).
+    ``shift_weights``: multiply every fit's sample weights by covariate-shift importance weights
+    (``covariate_shift_weights``: how test-like each training row looks), computed once per
+    train/target pair.
     """
+    state = {"shift": None}
+
     def fit(frame, columns, seed, reference_step):
         weights = None if half_life_steps is None else _recency_weights(frame["time_step"], reference_step, half_life_steps)
+        if state["shift"] is not None:
+            shift = state["shift"].reindex(frame["txId"]).to_numpy()
+            weights = shift if weights is None else np.asarray(weights) * shift
+            weights = weights / weights.mean()
         return _fit(frame, columns, seed, weights)
 
     def out_of_fold(train, target, columns, seed, reference, score_target):
@@ -490,6 +543,7 @@ def make_neighbour_stack(
         train = train.reset_index(drop=True)
         target = target.reset_index(drop=True)
         reference = train["time_step"].max()
+        state["shift"] = covariate_shift_weights(train, target, columns) if shift_weights else None
         oof, fold_target_scores = out_of_fold(train, target, columns, seed, reference, score_target=rich)
         if rich:
             target_scores = np.mean(fold_target_scores, axis=0)

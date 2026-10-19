@@ -241,3 +241,34 @@ def test_round11_variants_run_end_to_end():
         scores = make_neighbour_stack(half_life_steps=14, rich=True, wide=True, two_hop=True, **{option: True})(train, target, columns, 0, graph)
         assert scores.shape == (len(target),)
         assert np.all((scores >= 0) & (scores <= 1))
+
+
+def test_covariate_shift_weights_favour_test_like_rows():
+    from src.graph_stacking import covariate_shift_weights
+
+    rng = np.random.default_rng(0)
+    train = pd.DataFrame({"txId": [f"tr{i}" for i in range(2000)], "feat_1": rng.normal(0, 1, 2000), "feat_2": rng.normal(0, 1, 2000)})
+    target = pd.DataFrame({"txId": [f"te{i}" for i in range(1000)], "feat_1": rng.normal(1.5, 1, 1000), "feat_2": rng.normal(0, 1, 1000)})
+    weights = covariate_shift_weights(train, target, ["feat_1", "feat_2"], drop_rounds=0)
+
+    assert weights.index.tolist() == train["txId"].tolist()
+    assert weights.mean() == pytest.approx(1.0)
+    assert weights.min() >= 0.2 / 5 and weights.max() <= 5 * 5  # clipped before the final renormalisation
+    high = train["feat_1"].to_numpy() > 1.5
+    assert weights[high].mean() > 2 * weights[~high].mean()  # rows resembling the target count more
+
+
+def test_shift_weighted_stack_runs_end_to_end():
+    from src.graph_stacking import RICH_NEIGHBOUR_FEATURES, make_neighbour_stack
+
+    columns = ["feat_1", "feat_2", *RICH_NEIGHBOUR_FEATURES]
+    train = _frame(np.repeat(np.arange(1, 11), 60), 0)
+    target = _frame(np.repeat([11, 12], 100), 1)
+    for frame in (train, target):
+        for column in RICH_NEIGHBOUR_FEATURES:
+            frame[column] = np.arange(len(frame), dtype=float)
+    ids = [*train["txId"], *target["txId"]]
+    graph = build_graph(pd.DataFrame({"txId1": ids[:-1], "txId2": ids[1:]}))
+    scores = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, chain=True, shift_weights=True)(train, target, columns, 0, graph)
+    assert scores.shape == (len(target),)
+    assert np.all((scores >= 0) & (scores <= 1))

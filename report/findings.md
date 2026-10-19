@@ -1544,3 +1544,56 @@ Grade proxy if private tracks public: 10 × (0.96858/0.97012)^5 = **9.92 / 10**.
   Figure 1 extended to round 11; future work now names label-masked validation and
   covariate-shift weighting.
 - README results table updated.
+
+## 37. Round 12: covariate-shift importance weighting (2026-10-19)
+
+**Idea.** Recency weighting (half-life 14) helped twice (§14, §17) because it moves training
+toward the test period. Importance weighting by p(test | x) / p(train | x) (Shimodaira 2000;
+Sugiyama et al. 2007) is the data-driven version: weight training rows by how test-like they
+look, not only by how recent they are.
+
+**Adversarial diagnostic** (labeled training rows vs test rows, 5-fold out-of-fold LightGBM, no
+labels; repeatedly dropping the 10 features with the largest adversarial gain):
+
+| Features used | Adversarial AUC | Train p(test) median / p99 | Spearman ρ(weight, time step) |
+|---|---|---|---|
+| all 165 | 1.0000 | 0.0001 / 0.0002 | 0.18 |
+| − top 10 (feat_101, 103, 100, 136, 139, …) | 0.9914 | 0.014 / 0.75 | 0.62 |
+| − top 20 | 0.9743 | 0.049 / 0.73 | 0.54 |
+| **− top 30** (used) | **0.9400** | 0.111 / 0.71 | **0.37** |
+| − top 40 | 0.9290 | 0.125 / 0.72 | 0.39 |
+
+With all features the two periods separate perfectly through time-trend features, so every
+weight would be ~0. With 10 removed, the weights mostly repeat recency (ρ 0.62). From 30 removed,
+the weights capture similarity beyond time (ρ 0.37) and stop changing much.
+
+**Code:** `graph_stacking.covariate_shift_weights` (option `shift_weights`). Three rounds of
+dropping the top 10 adversarial features (for the weights only; the classifier keeps all 165);
+weights = (odds)^0.5, normalised to mean 1, clipped to [0.2, 5], renormalised; multiplied into
+the recency weights of every fit (stage 1, out-of-fold, stage 2). In local windows the same rule
+is applied between the window's training and validation rows. Default behaviour unchanged
+(byte-identical seed-0 window check). Tests: 2 new, 47 pass. Variant:
+`nbr_stack_wide_2hop_chain_shift_hl14` = pick 1 (chain) + shift weights.
+
+Weights on the full train → test fit: quantiles 1/10/50/90/99% = 0.20/0.20/0.84/1.99/3.74
+(14% at the floor). Mean weight by step block 1–7: 0.65, 8–14: 1.03, 15–21: 1.11, 22–28: 1.00,
+29–35: 1.46, so not a pure time trend. Licit and illicit rows get the same mean weight (1.00),
+so class balance is unchanged. Effective sample size: recency alone 77%, shift alone 63%,
+combined 43%.
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean |
+|---|---|---|---|---|---|---|
+| chain (pick 1, public 0.96858) | **0.8830** | 0.9344 | **0.8550** | **0.9968** | 0.9982 | **0.9335** |
+| + shift weights | 0.8740 | **0.9359** | 0.8440 | 0.9966 | **0.9984** | 0.9298 |
+
+- Flat on the Kaggle-aligned short windows (−0.0002 / +0.0002); −0.009 / −0.011 on two long
+  windows (long windows have mispredicted Kaggle six times).
+- Test rank correlation with pick 1 is **0.985** (with blend_top4 0.974), the largest change
+  of any variant since round 6, so the public score can move by several thousandths either way.
+
+**Pre-registered rule:** adopt as pick 1 only if public AUC ≥ **0.97158** (0.96858 + 0.003).
+Otherwise picks stay as in §35.
+
+| File | Public AUC |
+|---|---|
+| `submission_nbr_stack_wide_2hop_chain_shift_hl14.csv` | _pending_ |
