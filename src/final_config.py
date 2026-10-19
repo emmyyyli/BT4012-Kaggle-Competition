@@ -1,22 +1,23 @@
 """Version-controlled settings for the final submission model.
 
 ``python -m src.train`` and ``e1304439.ipynb`` read this file to reproduce the submission
-without re-running any search. Selection evidence: report/findings.md (sections 14-20).
+without re-running any search. Selection evidence: report/findings.md (sections 14-20, 35).
 
 Final model: two-stage graph stacking (``src/graph_stacking.py``) with tuned LightGBM in both
 stages, half-life-14 recency weights, one-hop labeled-neighbour context ("rich": structure
-counts and stage-1 score aggregates; "wide": mean/max/std/in-mean/out-mean of 25 key features)
-and two-hop context. Kaggle public ROC-AUC 0.96814. Each seed repeats both stages; seed
-predictions are averaged.
+counts and stage-1 score aggregates; "wide": mean/max/std/in-mean/out-mean of 25 key features),
+two-hop context and label-free payment-chain shape ("chain": longest path in/out, peel-chain
+runs). Kaggle public ROC-AUC 0.96858. Each seed repeats both stages; seed predictions are
+averaged. Without ``chain`` the model scored 0.96814 (a tie; report/findings.md section 35).
 """
 
 from src.model_zoo import SHALLOW_LGBM_PARAMS, TUNED_LGBM_PARAMS
 
-FINAL_NAME = "nbr_stack_wide_2hop_hl14"
+FINAL_NAME = "nbr_stack_wide_2hop_chain_hl14"
 FINAL_SEEDS = tuple(range(10))
 
 # Arguments for ``graph_stacking.make_neighbour_stack``.
-FINAL_STACK = {"half_life_steps": 14, "rich": True, "wide": True, "two_hop": True}
+FINAL_STACK = {"half_life_steps": 14, "rich": True, "wide": True, "two_hop": True, "chain": True}
 
 # Simpler alternative (public 0.96668): the same pipeline without the 25-feature "wide" stats.
 ALTERNATIVE_NAME = "nbr_stack_rich_2hop_hl14"

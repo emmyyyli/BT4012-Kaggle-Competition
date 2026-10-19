@@ -27,7 +27,7 @@ python -m pytest                     # unit tests
 ```
 
 The final model is defined in [`src/final_config.py`](src/final_config.py) and implemented
-in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.96814**):
+in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.96858**):
 
 1. **Stage 1:** a tuned, shallow LightGBM (9 leaves, 500 trees) on the 165 supplied features
    scores labeled training rows out-of-fold (5 folds of consecutive time steps) and test rows
@@ -35,7 +35,8 @@ in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.96814**)
 2. **Graph context:** over each transaction's *labeled* neighbours: stage-1 score
    mean/max/in-mean/out-mean, degrees, labeled-neighbour count and share, and
    mean/max/std/in-mean/out-mean of the 25 most influential supplied features. Walk-weighted means over labeled nodes two hops away are added; walks
-   may pass through featureless nodes.
+   may pass through featureless nodes. Label-free payment-chain shape from the full edge list
+   (longest payment path into / out of the transaction, peel-chain runs) is added as well.
 3. **Stage 2:** the same LightGBM on supplied features plus graph context.
 4. **Weighting and seeds:** both stages weight training rows toward recent steps (half-life
    14 steps); predictions are averaged over 10 seeds.
@@ -83,9 +84,14 @@ features. Every graph feature is therefore computed the same way in training and
 | `nbr_stack_rich_2hop_hl14` (+ two-hop context) | 0.96668 |
 | `nbr_stack_rich_2hop_prop_hl14` (+ 3-hop score propagation) | 0.96108 |
 | `blend_top_graph` (rank blend of three graph models) | 0.96587 |
-| `nbr_stack_wide_2hop_hl14` (wide statistics + two-hop, **final model**) | **0.96814** |
+| `nbr_stack_wide_2hop_hl14` (wide statistics + two-hop) | 0.96814 |
 | `nbr_stack_wide_2hop_hl14`, 30 seeds / half-life 21 (stability checks) | 0.96785 / 0.96670 |
 | `blend_top4` (rank blend of four graph models; private pick 2) | 0.96686 |
+| `nbr_stack_wide_2hop_hl14_iter` (extra round of collective classification) | 0.96698 |
+| `nbr_stack_wide_2hop_dir_hl14` (direction-split two-hop) | 0.96787 |
+| `nbr_stack_wide_2hop_hl14_fwd` (forward-only stage-1 scores) | 0.96503 |
+| `nbr_stack_wide_2hop_hub_hl14` / `_cent_hl14` (hub-weighted means / centrality) | 0.96766 / 0.96759 |
+| `nbr_stack_wide_2hop_chain_hl14` (+ peel-chain shape, **final model**, private pick 1) | **0.96858** |
 
 Full commentary for every round is in `report/findings.md`.
 
@@ -98,7 +104,7 @@ Full commentary for every round is in `report/findings.md`.
 | `src/run_step3_features.py` | Correlated-cluster ablation, TreeSHAP stability, adversarial feature dropping |
 | `src/run_step4_tuning.py` | Optuna tuning (LightGBM / XGBoost / CatBoost) on short-horizon windows; ensemble evaluation |
 | `src/run_step5_stress.py` | Stress tests: extra drift, feature noise, withheld fraud-heavy steps, rare positives |
-| `src/run_step8_variants.py` | Rounds 3–6: recency weighting, temporal bagging, graph-stacking variants (`evaluate`, `submit`, `blend`) |
+| `src/run_step8_variants.py` | Rounds 3–11: recency weighting, temporal bagging, graph-stacking variants (`evaluate`, `submit`, `blend`) |
 | `src/run_step6_extensions.py` | Directed GraphSAGE with test-consistent masking (`src/gnn_v2.py`); pseudo-labeling |
 | `src/run_feature_experiments.py`, `src/run_feature_importance.py`, `src/run_lgbm_robustness_experiments.py`, `src/run_graph_benchmark.py`, `src/gt_ssl_extractor.py` | Earlier single-holdout experiments (degree features, permutation importance, recency weighting, first GraphSAGE, GT-SSL embedding pilot) |
 

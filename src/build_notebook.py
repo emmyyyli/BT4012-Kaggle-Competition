@@ -45,9 +45,11 @@ experiments that led to these choices are run by the scripts in `src/` and recor
   and features of *labeled* neighbours (one and two hops away) become features for stage 2.
   Context is restricted to labeled nodes because those are the only transactions with features
   in the test period, so every graph feature is computed the same way in training and test.
+* Label-free payment-chain shape from the full edge list (longest payment path into / out of
+  each transaction, and the length of the unbroken peeling chain around it) is added too.
 * Training rows are weighted toward recent steps (half-life 14 steps).
 * Both stages use a tuned, shallow LightGBM; the configuration is in `src/final_config.py`
-  (Kaggle public ROC-AUC 0.96814).
+  (Kaggle public ROC-AUC 0.96858).
 """),
     code("""
 from pathlib import Path
@@ -172,7 +174,9 @@ than on the aggregated group.
    stage-1 scores over labeled neighbours; in/out degree; number and share of labeled
    neighbours; mean / max / std / incoming-mean / outgoing-mean over labeled neighbours of the
    25 most influential supplied features; and walk-weighted two-hop means of the stage-1 score
-   and of feat_53, feat_59, feat_61, feat_5, feat_3.
+   and of feat_53, feat_59, feat_61, feat_5, feat_3; and label-free chain shape from the full
+   edge list: longest payment path into / out of the transaction, a peel-like flag (one funder,
+   at most two spenders) and the length of the unbroken peel run before / after it.
 3. **Stage 2** — the same LightGBM on supplied features + graph context.
 4. Both stages weight training rows by 2^((t - last step)/14); classes are balanced; seeds
    0-9 are averaged.

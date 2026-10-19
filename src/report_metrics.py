@@ -69,11 +69,17 @@ SUBMISSIONS = [
     (5, "wide + recency", 0.96506, True),
     (5, "rich + two-hop", 0.96668, True),
     (6, "3-hop propagation", 0.96108, False),
-    (6, "wide + two-hop (final)", 0.96814, True),
+    (6, "wide + two-hop", 0.96814, True),
     (6, "blend of 3 graph models", 0.96587, False),
     (7, "final model, 30 seeds", 0.96785, False),
     (7, "half-life 21", 0.96670, False),
     (7, "blend of 4 graph models (pick 2)", 0.96686, False),
+    (8, "extra collective round", 0.96698, False),
+    (9, "direction-split two-hop", 0.96787, False),
+    (10, "forward-only stage-1 scores", 0.96503, False),
+    (11, "+ centrality", 0.96759, False),
+    (11, "+ peel-chain shape (final)", 0.96858, True),
+    (11, "+ hub-weighted means", 0.96766, False),
 ]
 LEADER_AUC = 0.97012
 PUBLIC_SE = 0.0077  # Hanley-McNeil SE of one public AUC (~270 illicit rows), findings 20.2
@@ -165,7 +171,8 @@ def figure_public_auc(path):
     ax.errorbar(final["x"], final["auc"], yerr=PUBLIC_SE, color=BLUE, linewidth=1, capsize=3, zorder=2)
     notes = {
         "tuned LightGBM": (6, -11, "left"), "recency weights": (-5, 9, "right"), "neighbour stacking": (4, -12, "left"),
-        "stack + rich context": (-5, 9, "right"), "wide + two-hop (final)": (-8, 15, "right"),
+        "stack + rich context": (-5, 9, "right"), "wide + two-hop": (-8, 15, "right"),
+        "+ peel-chain shape (final)": (4, -42, "right"),
         "aggregated-only": (7, 0, "left"), "0.7 LightGBM + 0.3 GraphSAGE": (7, 0, "left"), "3-hop propagation": (0, -13, "center"),
     }
     for _, row in frame.iterrows():

@@ -1475,6 +1475,72 @@ expected public moves are of order ±0.001–0.002.
 
 | File | Public AUC |
 |---|---|
-| `submission_nbr_stack_wide_2hop_hub_hl14.csv` | _pending_ |
-| `submission_nbr_stack_wide_2hop_chain_hl14.csv` | _pending_ |
-| `submission_nbr_stack_wide_2hop_cent_hl14.csv` | _pending_ |
+| `submission_nbr_stack_wide_2hop_hub_hl14.csv` | **0.96766** (2026-10-18) |
+| `submission_nbr_stack_wide_2hop_chain_hl14.csv` | **0.96858** (2026-10-18) |
+| `submission_nbr_stack_wide_2hop_cent_hl14.csv` | **0.96759** (2026-10-18) |
+
+## 35. Round 11 result: peel-chain shape is the new best public score — a tie, not a proven gain (2026-10-19)
+
+| Submission | Public | Δ vs pick 1 (0.96814) | Test rank ρ vs pick 1 | z (proxy SE; ×½ for the §29 calibration) |
+|---|---|---|---|---|
+| **+ chain** | **0.96858** | **+0.0004** | 0.9982 | +1.0 (≈ +0.5) |
+| + hub | 0.96766 | −0.0005 | 0.9968 | −0.8 (≈ −0.4) |
+| + cent | 0.96759 | −0.0006 | 0.9970 | −0.8 (≈ −0.4) |
+
+Leaderboard top at this point: 0.97012 (gap 0.0015).
+
+**What it shows.**
+1. **All three moves are inside the noise.** The spread of the three (0.0010) is smaller than
+   the 30-vs-10-seed rerun's move in §29 calibrated against. chain does not meet the
+   pre-registered ≥ 0.97114 rule for a *proven* improvement.
+2. **The prediction from local windows held again.** All three were flat on the
+   Kaggle-aligned short windows (within 0.0002) and all three landed within ±0.0006 of pick 1.
+   cent's large long-window loss (−0.018) did not show up on Kaggle, the sixth time long
+   windows have failed to predict the test set.
+3. **Label-free structure is now exhausted as a source.** Degree (§17.1), hub weighting,
+   centrality, chain shape, direction-split two-hop (§31) and 3-hop propagation (§23) all
+   describe the same complete edge list. Once labeled one- and two-hop context is in the model,
+   further descriptions of graph shape add ≤ 0.0005. The peel-chain features carry real signal
+   on their own (univariate AUC 0.64) but overlap with what the stack already knows.
+
+**Decision on the final picks.** The rule in §20.2 guards against *claiming* an improvement
+from noise; it does not say which of two tied models to submit. chain and pick 1 are tied in
+expectation (ρ 0.998), so choosing the higher public score costs nothing in expected private
+AUC, and the brief asks for the notebook of the *top* submission. Therefore:
+
+| Pick | File | Public | Why |
+|---|---|---|---|
+| 1 | `submission_nbr_stack_wide_2hop_chain_hl14.csv` | 0.96858 | best public; tied with the old pick 1; adds a documented AML mechanism (peeling chains) |
+| 2 | `submission_blend_top4.csv` | 0.96686 | unchanged steady pick; ρ 0.990 with the new pick 1, the most different strong file |
+
+The old pick 1 is *not* a sensible second pick: ρ 0.998 with chain means it would fail in the
+same way. `src/final_config.py` and `e1304439.ipynb` switch to the chain model (see §36).
+
+Grade proxy if private tracks public: 10 × (0.96858/0.97012)^5 = **9.92 / 10**.
+
+**Room for further improvement (assessed 2026-10-19).**
+- Every idea with a mechanism has now been tested: neighbours, recency, reach, detail,
+  direction, iteration, score quality, hub weighting, chain shape, centrality. Since round 6
+  (13 submissions) the best public score has moved by +0.0004 in total.
+- The only untested idea with a distinct mechanism is **covariate-shift importance weighting**
+  (weight training rows by how test-like they are; a data-driven form of recency). It cannot be
+  validated locally and recency is already near its best (§27), so the expected gain is
+  ≤ 0.002, below what the public LB can confirm.
+- Combining chain with hub or cent would be a combination search on noise (each alone moved
+  ≤ 0.0006); not recommended.
+- **Recommendation: freeze modelling.** The remaining value is in the report and the
+  reproducible notebook, not in more public-LB draws.
+
+## 36. Deliverables switched to the chain model (2026-10-19)
+
+- `src/final_config.py`: `FINAL_NAME = nbr_stack_wide_2hop_chain_hl14`,
+  `FINAL_STACK = {half_life_steps: 14, rich, wide, two_hop, chain}`.
+- `e1304439.ipynb` rebuilt and executed: 0 errors; its `submission_final.csv` is identical to
+  `submission_nbr_stack_wide_2hop_chain_hl14.csv` (max abs difference 0.0).
+- Report (`report/e1304439_report.md` / `.pdf`, still 4 pages): headline 0.96858; chain
+  features described in §2.1; Table 1 extended with rounds 9–11; two new strategy lessons
+  (structure beyond two hops is exhausted; consistent definitions, not matched noise); Table 2
+  recomputed for the chain model (false alarms at 95% recall 8.3% → 4.4% and 6.0% → 2.0%);
+  Figure 1 extended to round 11; future work now names label-masked validation and
+  covariate-shift weighting.
+- README results table updated.

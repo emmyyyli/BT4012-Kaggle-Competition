@@ -44,7 +44,7 @@ graph-structured problem. The approach is designed around those three properties
      used as a feature.
   3. *Graph structure with missing context in the test period.* → label-free neighbourhood
      features computed the same way in training and test.
-- **Headline result:** public ROC-AUC 0.94246 (first submission) → **0.96814** (leaderboard
+- **Headline result:** public ROC-AUC 0.94246 (first submission) → **0.96858** (leaderboard
   top 0.97012) _[add the private score once released]_.
 
 ## 2. Methodology
@@ -175,7 +175,8 @@ information always did.
 | Recency weighting (half-life 14) | short windows +0.001 | 0.95066 | adopted |
 | Labeled-neighbour stacking | failed local rule | 0.95389 | adopted |
 | + rich context / + recency / + two-hop | | 0.95871 / 0.96342 / 0.96668 | adopted |
-| + wide 25-feature statistics (final) | | **0.96814** | final model |
+| + wide 25-feature statistics | | 0.96814 | adopted |
+| + peel-chain shape (final; rounds 9–11 in findings §31–35) | | **0.96858** | final model |
 | 3-hop score propagation | best long-window graph variant | 0.96108 | rejected |
 | Final model, 30 seeds / half-life 21 | ρ ≥ 0.998 with final | 0.96785 / 0.96670 | stability check; within noise |
 | 4-model graph blend | | 0.96686 | private pick 2 |
@@ -184,7 +185,7 @@ information always did.
 **Why the final model and the two private picks** (§20.2, §23, §25):
 - Public SE ≈ 0.0077 (≈270 illicit rows), and public and private are random parts of the
   same rows. The top three models are within 1–2 *paired* SE (≈0.0015) of each other.
-- **Pick 1 (performance):** `nbr_stack_wide_2hop_hl14`, 0.96814.
+- **Pick 1 (performance):** `nbr_stack_wide_2hop_chain_hl14`, 0.96858 (findings §35).
 - **Pick 2 (steady):** `blend_top4`, a rank blend of the four best graph models (0.96686,
   within 0.0013 of pick 1). It averages over feature configurations.
 - Kaggle scores the better of the two picks on the private 70%, so pick 2 is insurance.
