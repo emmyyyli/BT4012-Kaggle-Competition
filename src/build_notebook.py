@@ -47,9 +47,11 @@ experiments that led to these choices are run by the scripts in `src/` and recor
   in the test period, so every graph feature is computed the same way in training and test.
 * Label-free payment-chain shape from the full edge list (longest payment path into / out of
   each transaction, and the length of the unbroken peeling chain around it) is added too.
-* Training rows are weighted toward recent steps (half-life 14 steps).
+* Training rows are weighted toward recent steps (half-life 14 steps) and toward rows that
+  look like the test period (covariate-shift importance weights from a train-vs-test
+  classifier, computed after removing the 30 features that most strongly encode time).
 * Both stages use a tuned, shallow LightGBM; the configuration is in `src/final_config.py`
-  (Kaggle public ROC-AUC 0.96858).
+  (Kaggle public ROC-AUC 0.9702).
 """),
     code("""
 from pathlib import Path
@@ -178,8 +180,11 @@ than on the aggregated group.
    edge list: longest payment path into / out of the transaction, a peel-like flag (one funder,
    at most two spenders) and the length of the unbroken peel run before / after it.
 3. **Stage 2** — the same LightGBM on supplied features + graph context.
-4. Both stages weight training rows by 2^((t - last step)/14); classes are balanced; seeds
-   0-9 are averaged.
+4. Both stages weight training rows by 2^((t - last step)/14) times a covariate-shift
+   importance weight: a LightGBM separates labeled training rows from test rows (5-fold
+   out-of-fold, no labels) after three rounds of dropping the 10 features with the largest
+   separating gain; weight = sqrt(p / (1 - p)), mean one, clipped to [0.2, 5]. Classes are
+   balanced; seeds 0-9 are averaged.
 """),
     code("""
 from src.model_zoo import TUNED_LGBM_PARAMS

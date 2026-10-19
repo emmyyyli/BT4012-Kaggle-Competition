@@ -27,7 +27,7 @@ python -m pytest                     # unit tests
 ```
 
 The final model is defined in [`src/final_config.py`](src/final_config.py) and implemented
-in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.96858**):
+in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.9702**):
 
 1. **Stage 1:** a tuned, shallow LightGBM (9 leaves, 500 trees) on the 165 supplied features
    scores labeled training rows out-of-fold (5 folds of consecutive time steps) and test rows
@@ -38,8 +38,10 @@ in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.96858**)
    may pass through featureless nodes. Label-free payment-chain shape from the full edge list
    (longest payment path into / out of the transaction, peel-chain runs) is added as well.
 3. **Stage 2:** the same LightGBM on supplied features plus graph context.
-4. **Weighting and seeds:** both stages weight training rows toward recent steps (half-life
-   14 steps); predictions are averaged over 10 seeds.
+4. **Weighting and seeds:** every fit weights training rows toward recent steps (half-life
+   14 steps) and toward rows that look like the test period (covariate-shift importance
+   weights from a train-vs-test classifier that excludes the 30 most time-encoding features);
+   predictions are averaged over 10 seeds.
 
 Context uses only labeled nodes because, in the test period, only labeled transactions have
 features. Every graph feature is therefore computed the same way in training and test.
@@ -86,13 +88,13 @@ features. Every graph feature is therefore computed the same way in training and
 | `blend_top_graph` (rank blend of three graph models) | 0.96587 |
 | `nbr_stack_wide_2hop_hl14` (wide statistics + two-hop) | 0.96814 |
 | `nbr_stack_wide_2hop_hl14`, 30 seeds / half-life 21 (stability checks) | 0.96785 / 0.96670 |
-| `blend_top4` (rank blend of four graph models; private pick 2) | 0.96686 |
+| `blend_top4` (rank blend of four graph models) | 0.96686 |
 | `nbr_stack_wide_2hop_hl14_iter` (extra round of collective classification) | 0.96698 |
 | `nbr_stack_wide_2hop_dir_hl14` (direction-split two-hop) | 0.96787 |
 | `nbr_stack_wide_2hop_hl14_fwd` (forward-only stage-1 scores) | 0.96503 |
 | `nbr_stack_wide_2hop_hub_hl14` / `_cent_hl14` (hub-weighted means / centrality) | 0.96766 / 0.96759 |
-| `nbr_stack_wide_2hop_chain_hl14` (+ peel-chain shape, **final model**, private pick 1) | **0.96858** |
-| `nbr_stack_wide_2hop_chain_shift_hl14` (+ test-similarity importance weights; recommended private pick B) | **0.9702** |
+| `nbr_stack_wide_2hop_chain_hl14` (+ peel-chain shape; private pick 2) | 0.96858 |
+| `nbr_stack_wide_2hop_chain_shift_hl14` (+ test-similarity importance weights, **final model**, private pick 1) | **0.9702** |
 
 Full commentary for every round is in `report/findings.md`.
 

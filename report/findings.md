@@ -1642,3 +1642,49 @@ switching the deliverable to B (§35 applied the same reasoning to a +0.0004 tie
 
 Grade proxy if private tracks public and the leader stays at 0.97012: 10 × min(1, 0.9702/0.97012)^5
 = **10.0 / 10** (any lead or deficit of this size is noise).
+
+## 39. Final picks fixed; deliverables switched to the shift-weighted model (2026-10-19)
+
+**Private-leaderboard picks (select both on Kaggle before 24 Oct 23:55 SGT):**
+
+| Pick | File | Public | Role |
+|---|---|---|---|
+| 1 | `submission_nbr_stack_wide_2hop_chain_shift_hl14.csv` | 0.9702 | best public; notebook model |
+| 2 | `submission_nbr_stack_wide_2hop_chain_hl14.csv` | 0.96858 | steady pick: the same model without shift weights |
+
+**Why the chain model, not blend_top4, is the steady second pick.** No choice can guarantee
+private performance (the public and private rows are random parts of the same test set, and a
+single private AUC has SE ≈ 0.005). The steadiest choice is the one whose private score is best
+characterised and that hedges pick 1's specific risk:
+1. **It hedges exactly the risky part of pick 1.** The two picks differ only by the shift
+   weights, the component with the least evidence (one submission, +0.0016, within noise) and
+   the most fitting variance (effective sample size 43% vs 77%; largest ranking change since
+   round 6, ρ 0.985). If the shift weights hurt on the private rows, pick 2 is the
+   un-weighted model; if they help, pick 1 already has them.
+2. **Its configuration is the best characterised.** Six close variants (wide_2hop at 10 and 30
+   seeds, half-life 21, direction-split, hub, centrality) all scored 0.9666–0.9686, so its
+   expected private score is pinned down far better than any single new file's.
+3. **blend_top4 is weaker and hedges nothing useful.** It scores 0.0017 lower and its members
+   are older, weaker graph models (down to 0.96342). It is also a graph-stacking model, so it
+   would fail in the same scenario as both picks (a private split on which graph context helps
+   less); its extra diversity (ρ 0.974 with pick 1) comes mostly from weaker members.
+4. A new rank blend of the two picks was not considered: unscored files add risk, and blends
+   have never beaten their best member here (§17, §23, §27).
+
+**Deliverables.**
+- `src/final_config.py`: `FINAL_NAME = nbr_stack_wide_2hop_chain_shift_hl14`
+  (`FINAL_STACK` + `shift_weights: True`); `SECOND_PICK_NAME` / `SECOND_PICK_STACK` = the chain
+  model; blend_top4 kept as documented history.
+- `e1304439.ipynb` rebuilt and executed: 0 errors; its `submission_final.csv` is identical to
+  `submission_nbr_stack_wide_2hop_chain_shift_hl14.csv` (max abs difference 0.0).
+- Report (still 4 pages): headline 0.9702; the weighting described in §2.2; Table 1 extended;
+  picks and rationale updated; Figure 1 extended to round 12; Table 2 recomputed:
+
+  | Window | Model | ROC-AUC | PR-AUC | P at 95% recall |
+  |---|---|---|---|---|
+  | ≤25 → 26–35 | non-graph / chain / **final** | 0.9954 / 0.9969 / **0.9966** | 0.9820 / 0.9886 / **0.9878** | 0.917 / 0.956 / **0.935** |
+  | ≤28 → 29–35 | non-graph / chain / **final** | 0.9960 / 0.9982 / **0.9984** | 0.9809 / 0.9932 / **0.9939** | 0.940 / 0.980 / **0.985** |
+
+  On these saturated short windows the shift weights are mixed (worse at ≤25, better at ≤28),
+  consistent with a within-noise effect.
+- README and outline updated.
