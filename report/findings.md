@@ -1688,3 +1688,49 @@ characterised and that hedges pick 1's specific risk:
   On these saturated short windows the shift weights are mixed (worse at ≤25, better at ≤28),
   consistent with a within-noise effect.
 - README and outline updated.
+
+## 40. Feature influence of the final model, and round 13: two-hop means over all 25 wide features (2026-10-22)
+
+Leaderboard top on 2026-10-22: **0.97363** (gap 0.0034 to our 0.9702, ≈ 0.45 public SE).
+
+**Feature influence of the final model** (seed 0 fit on all labeled rows; mean |TreeSHAP| share;
+`artifacts/report/final_model_feature_importance.csv`). 310 features = 165 supplied + 145
+engineered.
+
+| Group | n | Test share | Train share |
+|---|---|---|---|
+| supplied local (1–93) | 93 | 0.436 | 0.488 |
+| supplied aggregated (94–165) | 72 | 0.269 | 0.217 |
+| wide neighbour statistics | 125 | 0.186 | 0.178 |
+| two-hop context | 7 | 0.069 | 0.066 |
+| neighbour stage-1 scores | 4 | 0.026 | 0.038 |
+| chain shape | 5 | 0.010 | 0.010 |
+| structure | 4 | 0.003 | 0.004 |
+
+- Most influential single feature on test rows: `hop2_score_mean` (4.3%), then `feat_125`, `feat_53`,
+  `feat_5`, `feat_16`. `hop2_mean_feat_3` carries 2.1% on test vs 0.6% on train.
+- Strongest univariate predictors (training rows): `hop2_score_mean` AUC 0.927,
+  `nbr_score_mean_in` 0.874, `nbr_score_mean_out` 0.818, `nbr_score_mean` 0.810; the strongest
+  supplied feature is `feat_53` (AUC 0.143, i.e. 0.857 inverted). One-hop scores correlate
+  strongly but carry little SHAP (2.6%): they overlap with the two-hop score and are missing for
+  22–51% of rows.
+
+**Round 13 variant.** Two-hop context carries the most influence per feature and leans more on
+test than on train, so `two_hop_wide=True` takes the two-hop means over all 25
+`WIDE_NEIGHBOUR_FEATURES` instead of 5 (two-hop group 7 → 27 features). Variant
+`nbr_stack_wide_2hopw_chain_shift_hl14` = pick 1 + this option. Final-model path byte-identical to
+HEAD; 1 new test, 48 pass. Tables `artifacts/round3/round13_*.csv`.
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean |
+|---|---|---|---|---|---|---|
+| pick 1 (0.9702) | 0.8740 | 0.9359 | 0.8440 | 0.9966 | 0.9984 | 0.9298 |
+| + two-hop over 25 features | 0.8730 | 0.9364 | 0.8423 | 0.9966 | 0.9984 | 0.9294 |
+
+Identical on the Kaggle-aligned short windows; within ±0.002 elsewhere. Test rank ρ 0.992 with
+pick 1, 0.979 with pick 2.
+
+**Pre-registered rule:** replace pick 1 only if public AUC ≥ **0.9732** (0.9702 + 0.003).
+
+| File | Public AUC |
+|---|---|
+| `submission_nbr_stack_wide_2hopw_chain_shift_hl14.csv` | _pending_ |

@@ -272,3 +272,14 @@ def test_shift_weighted_stack_runs_end_to_end():
     scores = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, chain=True, shift_weights=True)(train, target, columns, 0, graph)
     assert scores.shape == (len(target),)
     assert np.all((scores >= 0) & (scores <= 1))
+
+
+def test_two_hop_wide_covers_all_wide_features():
+    from src.graph_stacking import WIDE_NEIGHBOUR_FEATURES, two_hop_features
+
+    edges = pd.DataFrame({"txId1": ["a", "x"], "txId2": ["x", "c"]})
+    frame = pd.DataFrame({"txId": ["a", "c"], **{f: [1.0, 2.0] for f in WIDE_NEIGHBOUR_FEATURES}})
+    out = two_hop_features(build_graph(edges), frame, pd.Series({"a": 0.1, "c": 0.9}), mean_features=WIDE_NEIGHBOUR_FEATURES)
+
+    assert len([c for c in out.columns if c.startswith("hop2_mean_")]) == 25
+    assert out.loc["a", "hop2_mean_feat_125"] == pytest.approx(2.0)

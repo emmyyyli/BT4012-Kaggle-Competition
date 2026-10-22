@@ -453,7 +453,7 @@ def covariate_shift_weights(train, target, columns, drop_rounds=3, drop_per_roun
 
 def make_neighbour_stack(
     half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False, forward_oof=False,
-    hub=False, chain=False, centrality=False, shift_weights=False,
+    hub=False, chain=False, centrality=False, shift_weights=False, two_hop_wide=False,
 ):
     """Two-stage stacking over labeled neighbours.
 
@@ -464,6 +464,8 @@ def make_neighbour_stack(
     ``wide``: replace the 5 rich neighbour means with mean/max/std/in-mean/out-mean of the 25
     WIDE_NEIGHBOUR_FEATURES over labeled neighbours (requires ``rich``).
     ``two_hop``: add walk-weighted two-hop means of stage-1 scores and the rich features.
+    ``two_hop_wide``: take the two-hop means over all 25 WIDE_NEIGHBOUR_FEATURES instead of
+    the 5 rich ones (requires ``two_hop``).
     ``propagate``: add 3-hop label-free score propagation (``propagation_features``).
     ``directional``: add two-hop score means split by payment direction
     (``directional_two_hop_features``: forward, backward, co-spent, co-funded).
@@ -518,7 +520,8 @@ def make_neighbour_stack(
             if wide:
                 neighbour = neighbour.join(neighbour_wide_features(graph, both))
             if two_hop:
-                neighbour = neighbour.join(two_hop_features(graph, both, scores))
+                hop2_features = WIDE_NEIGHBOUR_FEATURES if two_hop_wide else RICH_NEIGHBOUR_FEATURES
+                neighbour = neighbour.join(two_hop_features(graph, both, scores, mean_features=hop2_features))
             if propagate:
                 neighbour = neighbour.join(propagation_features(graph, both, scores))
             if directional:
