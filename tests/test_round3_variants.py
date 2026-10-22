@@ -283,3 +283,19 @@ def test_two_hop_wide_covers_all_wide_features():
 
     assert len([c for c in out.columns if c.startswith("hop2_mean_")]) == 25
     assert out.loc["a", "hop2_mean_feat_125"] == pytest.approx(2.0)
+
+
+def test_two_hop_max_takes_highest_labeled_endpoint_through_blank_nodes():
+    from src.graph_stacking import two_hop_max_features
+
+    # a - x - {c, d}, a - b - e : x is featureless; a's labeled two-hop endpoints are c, d, e.
+    edges = pd.DataFrame({"txId1": ["a", "x", "x", "a", "b"], "txId2": ["x", "c", "d", "b", "e"]})
+    frame = pd.DataFrame({"txId": ["a", "b", "c", "d", "e"]})
+    scores = pd.Series({"a": 0.99, "b": 0.1, "c": 0.2, "d": 0.7, "e": 0.3})
+    out = two_hop_max_features(build_graph(edges), frame, scores)
+
+    assert out.loc["a", "hop2_score_max"] == pytest.approx(0.7)  # not its own 0.99
+    assert out.loc["a", "hop2_distinct_labeled"] == 3
+    assert out.loc["a", "hop2_n_high_score"] == 1
+    assert out.loc["e", "hop2_score_max"] == pytest.approx(0.99)  # e - b - a
+    assert out.loc["c", "hop2_distinct_labeled"] == 2  # c - x - a and c - x - d

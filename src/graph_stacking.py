@@ -150,6 +150,61 @@ def two_hop_features(graph, frame, scores, mean_features=RICH_NEIGHBOUR_FEATURES
     return out
 
 
+_TWO_HOP_SET_CACHE = {}
+
+
+def _two_hop_sets(graph):
+    """Binary matrix of distinct nodes reachable by an undirected two-step walk (self excluded)."""
+    key = id(graph)
+    if key not in _TWO_HOP_SET_CACHE:
+        _, adjacency = _undirected_adjacency(graph)
+        reach = (adjacency @ adjacency).tocsr()
+        reach.setdiag(0)
+        reach.eliminate_zeros()
+        reach.data[:] = 1.0
+        _TWO_HOP_SET_CACHE[key] = reach
+    return _TWO_HOP_SET_CACHE[key]
+
+
+def two_hop_max_features(graph, frame, scores):
+    """Highest stage-1 score among labeled transactions exactly two steps away.
+
+    The two-hop means average over every labeled node two steps away, so one suspicious
+    transaction among many licit ones is diluted. The max asks whether *any* labeled
+    transaction within two steps looks illicit. Walks may pass through featureless nodes; only
+    nodes in ``frame`` count as endpoints, and a node is never its own two-hop endpoint. Also
+    returns the number of distinct labeled two-hop endpoints and how many score above 0.5.
+    """
+    nodes, _ = _undirected_adjacency(graph)
+    reach = _two_hop_sets(graph)
+    position = nodes.get_indexer(frame["txId"])
+    present = position >= 0
+    labeled = np.zeros(len(nodes), dtype=bool)
+    labeled[position[present]] = True
+    values = np.full(len(nodes), -np.inf)
+    values[position[present]] = scores.reindex(frame["txId"]).to_numpy()[present]
+    restricted = (reach @ sp.diags(labeled.astype(float))).tocsr()
+    restricted.eliminate_zeros()
+    counts = np.diff(restricted.indptr)
+    endpoint_scores = values[restricted.indices]
+    best = np.full(len(nodes), np.nan)
+    has = counts > 0
+    starts = restricted.indptr[:-1][has]
+    best[has] = np.maximum.reduceat(endpoint_scores, starts)
+    high = np.add.reduceat((endpoint_scores > 0.5).astype(float), starts) if has.any() else np.array([])
+    n_high = np.zeros(len(nodes))
+    n_high[has] = high
+    index = np.clip(position, 0, None)
+    return pd.DataFrame(
+        {
+            "hop2_score_max": np.where(present, best[index], np.nan),
+            "hop2_distinct_labeled": np.where(present, counts[index], 0).astype(float),
+            "hop2_n_high_score": np.where(present, n_high[index], 0.0),
+        },
+        index=frame["txId"],
+    )
+
+
 _DIRECTED_CACHE = {}
 
 
@@ -453,7 +508,7 @@ def covariate_shift_weights(train, target, columns, drop_rounds=3, drop_per_roun
 
 def make_neighbour_stack(
     half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False, forward_oof=False,
-    hub=False, chain=False, centrality=False, shift_weights=False, two_hop_wide=False,
+    hub=False, chain=False, centrality=False, shift_weights=False, two_hop_wide=False, two_hop_max=False,
 ):
     """Two-stage stacking over labeled neighbours.
 
@@ -466,6 +521,8 @@ def make_neighbour_stack(
     ``two_hop``: add walk-weighted two-hop means of stage-1 scores and the rich features.
     ``two_hop_wide``: take the two-hop means over all 25 WIDE_NEIGHBOUR_FEATURES instead of
     the 5 rich ones (requires ``two_hop``).
+    ``two_hop_max``: add the highest stage-1 score among labeled two-hop endpoints
+    (``two_hop_max_features``).
     ``propagate``: add 3-hop label-free score propagation (``propagation_features``).
     ``directional``: add two-hop score means split by payment direction
     (``directional_two_hop_features``: forward, backward, co-spent, co-funded).
@@ -522,6 +579,8 @@ def make_neighbour_stack(
             if two_hop:
                 hop2_features = WIDE_NEIGHBOUR_FEATURES if two_hop_wide else RICH_NEIGHBOUR_FEATURES
                 neighbour = neighbour.join(two_hop_features(graph, both, scores, mean_features=hop2_features))
+            if two_hop_max:
+                neighbour = neighbour.join(two_hop_max_features(graph, both, scores))
             if propagate:
                 neighbour = neighbour.join(propagation_features(graph, both, scores))
             if directional:

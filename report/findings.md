@@ -1733,4 +1733,75 @@ pick 1, 0.979 with pick 2.
 
 | File | Public AUC |
 |---|---|
-| `submission_nbr_stack_wide_2hopw_chain_shift_hl14.csv` | _pending_ |
+| `submission_nbr_stack_wide_2hopw_chain_shift_hl14.csv` | **0.97097** (2026-10-22) |
+
+## 41. Round 13 result: two-hop over 25 features, 0.97097 — a small move in a plausible direction (2026-10-22)
+
+| Submission | Public | Δ vs pick 1 (0.9702) | Test rank ρ vs pick 1 | z (proxy SE 0.0010; calibrated ≈ 0.0019) |
+|---|---|---|---|---|
+| + two-hop over 25 features | **0.97097** | **+0.0008** | 0.992 | +0.8 (≈ +0.4) |
+
+Below the pre-registered 0.9732; not a proven improvement.
+
+**What changed, and where.** The only change: 20 more two-hop means (all 25 wide features instead of
+5). Comparing the two submission files (no labels):
+- Rows reached *only* by two-hop context moved most (mean |percentile change| 0.036, 3,335 rows),
+  against 0.025 for rows with a labeled direct neighbour and 0.011 for rows with no labeled
+  context. The change acts where the mechanism says it should.
+- The top of the ranking is almost untouched (top 3% / 6% / 10% overlap 98.5% / 97.1% / 93.5%;
+  top-5% rows move 0.0015 on average). Changes sit in the middle and lower ranks, where the hard
+  illicit cases of a 0.97-AUC model are found. Steps 43–49 moved slightly more than 36–42
+  (0.029 vs 0.026).
+- In the seed-0 refit the two-hop group's test SHAP share rose from 6.9% to 10.5% (the 20 new
+  features 4.6%; led by `hop2_mean_feat_90` 1.3%, `hop2_mean_feat_161` 1.0%), while the one-hop
+  wide statistics fell from 18.6% to 16.4%: the model swapped some one-hop detail for two-hop
+  reach.
+
+**What it means.**
+1. Reach remains the one graph axis that still pays, but at diminishing size: +0.0033 (round 5),
+   +0.0015 (round 6), now +0.0008. Shape descriptions (direction, hub, centrality, chain) added
+   ≤ 0.0006.
+2. The last three changes that went up (chain +0.0004, shift +0.0016, two-hop-wide +0.0008) total
+   +0.0028 since 0.96814, each within noise; together they are mildly reassuring but not proof,
+   because each was kept *because* it went up (selection on the public rows).
+3. The model family sits at public 0.970–0.971. The leaderboard top (0.97363) is 0.0027 ahead,
+   ≈ 0.35 public SE.
+
+**Pick decision.** As in §35 and §38, a tie can be resolved toward the higher public score at no
+expected private cost, and the brief asks for the notebook of the top submission. Options:
+keep pick 1 = shift model (0.9702) per the +0.003 rule, or switch pick 1 to this model (0.97097),
+which also differs more from pick 2 (ρ 0.979 vs 0.985 with the chain model). Pick 2 stays the
+chain model (0.96858) either way.
+
+## 42. Round 14: two-hop *max* score — no change (2026-10-22); final picks and deliverables
+
+**Variant** `nbr_stack_wide_2hopw_max_chain_shift_hl14` = pick 1 (0.97097) + `two_hop_max_features`:
+the highest stage-1 score among distinct labeled two-hop endpoints, their number, and how many
+score above 0.5. Rationale (§41): every two-hop feature was a mean, so one suspicious transaction
+two steps away among many licit ones is diluted; the max asks whether *any* is suspicious.
+1 new test, 49 pass; final-model path unchanged.
+
+| Submission | Public | Δ vs pick 1 (0.97097) | Test rank ρ vs pick 1 | z (proxy SE 0.0006; calibrated ≈ 0.0011) |
+|---|---|---|---|---|
+| + two-hop max score | 0.97085 | −0.0001 | 0.997 | −0.2 (≈ −0.1) |
+
+Local check (2 seeds; `artifacts/round3/round14_*.csv`): short windows 0.9969 / 0.9985 vs pick 1's
+0.9966 / 0.9984 (+0.0003 / +0.0001, flat); long windows −0.0033 / −0.0049 / +0.0008. Consistent
+with the public result.
+
+**Reading.** A null result: the change is a fifth of a (calibrated) standard error, and the test
+ranking barely moved (ρ 0.997). The max adds nothing the two-hop mean, the one-hop max and the
+two-hop walk count do not already carry: a transaction with a suspicious node two steps away
+almost always also has a raised two-hop mean or a suspicious direct neighbour. This closes the
+reach axis: means over 5 → 25 features gave +0.0008, the max gives nothing.
+
+**Modelling is frozen** (cutoff from §41: no deliverable switch after 23 Oct). Final private picks:
+
+| Pick | File | Public |
+|---|---|---|
+| 1 | `submission_nbr_stack_wide_2hopw_chain_shift_hl14.csv` | 0.97097 |
+| 2 | `submission_nbr_stack_wide_2hop_chain_hl14.csv` | 0.96858 |
+
+Deliverables switched to pick 1: `FINAL_STACK` adds `two_hop_wide: True`; report headline
+0.97097, Table 1, Table 2 (false alarms at 95% recall 8.3% → 5.7% and 6.0% → 1.7%), Figure 1
+(round 13, leaderboard line updated to 0.97363); README and outline updated.

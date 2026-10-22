@@ -80,9 +80,10 @@ SUBMISSIONS = [
     (11, "+ centrality", 0.96759, False),
     (11, "+ peel-chain shape", 0.96858, True),
     (11, "+ hub-weighted means", 0.96766, False),
-    (12, "+ test-similarity weights (final)", 0.9702, True),
+    (12, "+ test-similarity weights", 0.9702, True),
+    (13, "+ two-hop over 25 features (final)", 0.97097, True),
 ]
-LEADER_AUC = 0.97012
+LEADER_AUC = 0.97363
 PUBLIC_SE = 0.0077  # Hanley-McNeil SE of one public AUC (~270 illicit rows), findings 20.2
 
 
@@ -172,8 +173,8 @@ def figure_public_auc(path):
     ax.errorbar(final["x"], final["auc"], yerr=PUBLIC_SE, color=BLUE, linewidth=1, capsize=3, zorder=2)
     notes = {
         "tuned LightGBM": (6, -11, "left"), "recency weights": (-5, 9, "right"), "neighbour stacking": (4, -12, "left"),
-        "stack + rich context": (-5, 9, "right"), "wide + two-hop": (-8, 15, "right"),
-        "+ test-similarity weights (final)": (4, -42, "right"),
+        "stack + rich context": (-5, 9, "right"), "wide + two-hop": (-8, 7, "right"),
+        "+ two-hop over 25 features (final)": (4, -42, "right"),
         "aggregated-only": (7, 0, "left"), "0.7 LightGBM + 0.3 GraphSAGE": (7, 0, "left"), "3-hop propagation": (0, -13, "center"),
     }
     for _, row in frame.iterrows():
@@ -185,7 +186,7 @@ def figure_public_auc(path):
     for round_id, (lo, hi) in bounds.iterrows():
         if round_id:
             ax.axvline(lo - 0.5, color=GRID, linewidth=0.8)
-        ax.text((lo + hi) / 2, 0.8745, f"R{round_id}", ha="center", color=INK_SECONDARY, fontsize=8)
+        ax.text((lo + hi) / 2, 0.8745, f"R{round_id}", ha="center", color=INK_SECONDARY, fontsize=7 if hi - lo < 1 else 8)
     ax.set_xlim(0.4, len(frame) + 0.6)
     ax.set_ylim(0.872, 0.981)
     ax.set_xticks([])

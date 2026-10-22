@@ -44,7 +44,7 @@ graph-structured problem. The approach is designed around those three properties
      used as a feature.
   3. *Graph structure with missing context in the test period.* → label-free neighbourhood
      features computed the same way in training and test.
-- **Headline result:** public ROC-AUC 0.94246 (first submission) → **0.9702** (leaderboard
+- **Headline result:** public ROC-AUC 0.94246 (first submission) → **0.97097** (leaderboard
   top 0.97012) _[add the private score once released]_.
 
 ## 2. Methodology
@@ -177,7 +177,8 @@ information always did.
 | + rich context / + recency / + two-hop | | 0.95871 / 0.96342 / 0.96668 | adopted |
 | + wide 25-feature statistics | | 0.96814 | adopted |
 | + peel-chain shape (rounds 9–11 in findings §31–35) | | 0.96858 | private pick 2 |
-| + covariate-shift importance weights (final; findings §37–39) | | **0.9702** | final model |
+| + covariate-shift importance weights (findings §37–39) | | 0.9702 | adopted |
+| + two-hop means over all 25 features (final; findings §40–42) | | **0.97097** | final model |
 | 3-hop score propagation | best long-window graph variant | 0.96108 | rejected |
 | Final model, 30 seeds / half-life 21 | ρ ≥ 0.998 with final | 0.96785 / 0.96670 | stability check; within noise |
 | 4-model graph blend | | 0.96686 | superseded as pick 2 |
@@ -186,7 +187,7 @@ information always did.
 **Why the final model and the two private picks** (§20.2, §23, §25):
 - Public SE ≈ 0.0077 (≈270 illicit rows), and public and private are random parts of the
   same rows. The top three models are within 1–2 *paired* SE (≈0.0015) of each other.
-- **Pick 1 (performance):** `nbr_stack_wide_2hop_chain_shift_hl14`, 0.9702 (findings §38–39).
+- **Pick 1 (performance):** `nbr_stack_wide_2hopw_chain_shift_hl14`, 0.97097 (findings §41–42).
 - **Pick 2 (steady):** `nbr_stack_wide_2hop_chain_hl14` (0.96858): the final model without
   shift weights (findings §39).
 - Kaggle scores the better of the two picks on the private 70%, so pick 2 is insurance.
@@ -282,7 +283,7 @@ complexity.
 ---
 
 ### Checklist before submitting
-- [x] Final picks (findings §39): pick 1 `submission_nbr_stack_wide_2hop_chain_shift_hl14.csv`, pick 2 `submission_nbr_stack_wide_2hop_chain_hl14.csv`. Select both on Kaggle before 24 Oct 23:55 SGT.
+- [x] Final picks (findings §39): pick 1 `submission_nbr_stack_wide_2hopw_chain_shift_hl14.csv`, pick 2 `submission_nbr_stack_wide_2hop_chain_hl14.csv`. Select both on Kaggle before 24 Oct 23:55 SGT.
 - [ ] Repo link works for the assessors; `e1304439.ipynb` reproduces pick 1 (verified §25).
 - [x] Figures 1–2 regenerated with round 7 and leader 0.97012.
 - [ ] Tables fit within 4 pages; file named `e1304439.pdf`.
