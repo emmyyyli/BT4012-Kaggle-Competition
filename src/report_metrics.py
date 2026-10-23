@@ -81,9 +81,13 @@ SUBMISSIONS = [
     (11, "+ peel-chain shape", 0.96858, True),
     (11, "+ hub-weighted means", 0.96766, False),
     (12, "+ test-similarity weights", 0.9702, True),
-    (13, "+ two-hop over 25 features (final)", 0.97097, True),
+    (13, "+ two-hop over 25 features", 0.97097, True),
+    (14, "two-hop max score", 0.97085, False),
+    (15, "+ stage-2 column matching (final)", 0.97190, True),
+    (16, "stage-2 fewer columns", 0.97131, False),
+    (16, "stage-2 stronger L2", 0.97136, False),
 ]
-LEADER_AUC = 0.97363
+LEADER_AUC = 0.97446
 PUBLIC_SE = 0.0077  # Hanley-McNeil SE of one public AUC (~270 illicit rows), findings 20.2
 
 
@@ -174,7 +178,7 @@ def figure_public_auc(path):
     notes = {
         "tuned LightGBM": (6, -11, "left"), "recency weights": (-5, 9, "right"), "neighbour stacking": (4, -12, "left"),
         "stack + rich context": (-5, 9, "right"), "wide + two-hop": (-8, 7, "right"),
-        "+ two-hop over 25 features (final)": (4, -42, "right"),
+        "+ stage-2 column matching (final)": (4, -42, "right"),
         "aggregated-only": (7, 0, "left"), "0.7 LightGBM + 0.3 GraphSAGE": (7, 0, "left"), "3-hop propagation": (0, -13, "center"),
     }
     for _, row in frame.iterrows():

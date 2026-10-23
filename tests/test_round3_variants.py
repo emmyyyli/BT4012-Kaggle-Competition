@@ -160,9 +160,9 @@ def test_forward_oof_scores_each_block_from_earlier_steps_only(monkeypatch):
     fitted_steps = []
     real_fit = gs._fit
 
-    def recording_fit(frame, cols, seed, weights=None):
+    def recording_fit(frame, cols, seed, weights=None, params=None):
         fitted_steps.append(sorted(frame["time_step"].unique()))
-        return real_fit(frame, cols, seed, weights)
+        return real_fit(frame, cols, seed, weights, params)
 
     monkeypatch.setattr(gs, "_fit", recording_fit)
     scores = gs.make_neighbour_stack(half_life_steps=14, rich=True, forward_oof=True)(train, target, columns, 0, graph)
@@ -299,3 +299,55 @@ def test_two_hop_max_takes_highest_labeled_endpoint_through_blank_nodes():
     assert out.loc["a", "hop2_n_high_score"] == 1
     assert out.loc["e", "hop2_score_max"] == pytest.approx(0.99)  # e - b - a
     assert out.loc["c", "hop2_distinct_labeled"] == 2  # c - x - a and c - x - d
+
+
+def test_stage2_match_features_scales_column_sampling_in_final_stage_only(monkeypatch):
+    import src.graph_stacking as gs
+
+    columns = ["feat_1", "feat_2", *gs.RICH_NEIGHBOUR_FEATURES]
+    train = _frame(np.repeat(np.arange(1, 11), 30), 0)
+    target = _frame(np.repeat([11, 12], 20), 1)
+    for frame in (train, target):
+        for column in gs.RICH_NEIGHBOUR_FEATURES:
+            frame[column] = np.arange(len(frame), dtype=float)
+    ids = [*train["txId"], *target["txId"]]
+    graph = build_graph(pd.DataFrame({"txId1": ids[:-1], "txId2": ids[1:]}))
+    seen = []
+    real_fit = gs._fit
+
+    def recording_fit(frame, cols, seed, weights=None, params=None):
+        seen.append((len(cols), None if params is None else params["colsample_bytree"]))
+        return real_fit(frame, cols, seed, weights, params)
+
+    monkeypatch.setattr(gs, "_fit", recording_fit)
+    gs.make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, stage2_match_features=True)(train, target, columns, 0, graph)
+
+    assert all(params is None for _, params in seen[:-1])  # stage-1 fits keep the tuned settings
+    n_stage2, colsample = seen[-1]
+    assert colsample == pytest.approx(gs.TUNED_LGBM_PARAMS["colsample_bytree"] * len(columns) / n_stage2)
+
+
+def test_stage2_overrides_apply_to_final_stage_only(monkeypatch):
+    import src.graph_stacking as gs
+
+    columns = ["feat_1", "feat_2", *gs.RICH_NEIGHBOUR_FEATURES]
+    train = _frame(np.repeat(np.arange(1, 11), 30), 0)
+    target = _frame(np.repeat([11, 12], 20), 1)
+    for frame in (train, target):
+        for column in gs.RICH_NEIGHBOUR_FEATURES:
+            frame[column] = np.arange(len(frame), dtype=float)
+    ids = [*train["txId"], *target["txId"]]
+    graph = build_graph(pd.DataFrame({"txId1": ids[:-1], "txId2": ids[1:]}))
+    seen = []
+    real_fit = gs._fit
+
+    def recording_fit(frame, cols, seed, weights=None, params=None):
+        seen.append(params)
+        return real_fit(frame, cols, seed, weights, params)
+
+    monkeypatch.setattr(gs, "_fit", recording_fit)
+    gs.make_neighbour_stack(half_life_steps=14, rich=True, stage2_match_features=True, stage2_overrides={"reg_lambda": 8.0})(train, target, columns, 0, graph)
+
+    assert all(params is None for params in seen[:-1])
+    assert seen[-1]["reg_lambda"] == 8.0
+    assert seen[-1]["colsample_bytree"] < gs.TUNED_LGBM_PARAMS["colsample_bytree"]  # matching still applied

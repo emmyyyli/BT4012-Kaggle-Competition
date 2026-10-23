@@ -19,8 +19,8 @@ from src.model_zoo import TUNED_LGBM_PARAMS, lgbm_factory
 STACK_FOLDS = 5
 
 
-def _fit(frame, columns, seed, weights=None):
-    model = lgbm_factory(TUNED_LGBM_PARAMS)(seed)
+def _fit(frame, columns, seed, weights=None, params=None):
+    model = lgbm_factory(TUNED_LGBM_PARAMS if params is None else params)(seed)
     kwargs = {} if weights is None else {"sample_weight": weights}
     return model.fit(frame[columns], frame["label"].to_numpy(), **kwargs)
 
@@ -509,6 +509,7 @@ def covariate_shift_weights(train, target, columns, drop_rounds=3, drop_per_roun
 def make_neighbour_stack(
     half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False, forward_oof=False,
     hub=False, chain=False, centrality=False, shift_weights=False, two_hop_wide=False, two_hop_max=False,
+    stage2_match_features=False, stage2_overrides=None,
 ):
     """Two-stage stacking over labeled neighbours.
 
@@ -523,6 +524,11 @@ def make_neighbour_stack(
     the 5 rich ones (requires ``two_hop``).
     ``two_hop_max``: add the highest stage-1 score among labeled two-hop endpoints
     (``two_hop_max_features``).
+    ``stage2_match_features``: in the final stage only, scale ``colsample_bytree`` by
+    (supplied features / stage-2 features), so each stage-2 tree samples as many columns as a
+    stage-1 tree (about 106) instead of twice as many from the overlapping graph statistics.
+    ``stage2_overrides``: dict of LightGBM settings applied to the final stage only, after
+    ``stage2_match_features`` (e.g. ``{"reg_lambda": 8.0}``).
     ``propagate``: add 3-hop label-free score propagation (``propagation_features``).
     ``directional``: add two-hop score means split by payment direction
     (``directional_two_hop_features``: forward, backward, co-spent, co-funded).
@@ -545,13 +551,13 @@ def make_neighbour_stack(
     """
     state = {"shift": None}
 
-    def fit(frame, columns, seed, reference_step):
+    def fit(frame, columns, seed, reference_step, params=None):
         weights = None if half_life_steps is None else _recency_weights(frame["time_step"], reference_step, half_life_steps)
         if state["shift"] is not None:
             shift = state["shift"].reindex(frame["txId"]).to_numpy()
             weights = shift if weights is None else np.asarray(weights) * shift
             weights = weights / weights.mean()
-        return _fit(frame, columns, seed, weights)
+        return _fit(frame, columns, seed, weights, params)
 
     def out_of_fold(train, target, columns, seed, reference, score_target):
         """Out-of-fold scores for ``train`` (folds = blocks of time steps) + fold models' target scores."""
@@ -617,7 +623,13 @@ def make_neighbour_stack(
             oof, fold_target_scores = out_of_fold(train_x, target_x, stacked_columns, seed, reference, score_target=True)
             scores = pd.concat([pd.Series(oof, index=train["txId"]), pd.Series(np.mean(fold_target_scores, axis=0), index=target["txId"])])
         train_x, target_x, stacked_columns = with_context(train, target, columns, graph_context(train, target, scores, graph))
-        model = fit(train_x, stacked_columns, seed, reference)
+        stage2_params = None
+        if stage2_match_features or stage2_overrides:
+            stage2_params = dict(TUNED_LGBM_PARAMS)
+            if stage2_match_features:
+                stage2_params["colsample_bytree"] *= len(columns) / len(stacked_columns)
+            stage2_params.update(stage2_overrides or {})
+        model = fit(train_x, stacked_columns, seed, reference, stage2_params)
         return model.predict_proba(target_x[stacked_columns])[:, 1]
 
     return fit_predict

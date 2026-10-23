@@ -1805,3 +1805,83 @@ reach axis: means over 5 → 25 features gave +0.0008, the max gives nothing.
 Deliverables switched to pick 1: `FINAL_STACK` adds `two_hop_wide: True`; report headline
 0.97097, Table 1, Table 2 (false alarms at 95% recall 8.3% → 5.7% and 6.0% → 1.7%), Figure 1
 (round 13, leaderboard line updated to 0.97363); README and outline updated.
+
+## 43. Round 15: stage-2 column sampling matched to stage 1 (2026-10-24)
+
+Leaderboard top: **0.97446** (gap 0.0035 to our 0.97097). Last day; 3 submissions left.
+
+**Variant** `nbr_stack_wide_2hopw_chain_shift_s2reg_hl14` = pick 1 + `stage2_match_features`: in the
+final stage only, `colsample_bytree` is scaled by 165/330 (0.644 → 0.322), so each stage-2 tree
+samples about 106 columns, as a stage-1 tree does, instead of about 212 drawn mostly from
+overlapping graph statistics. Pre-specified, not tuned. Pick-1 path byte-identical to HEAD;
+1 new test, 50 pass. Test rank ρ 0.995 with pick 1, 0.983 with pick 2.
+
+Local check (2 seeds; `artifacts/round3/round15_*.csv`):
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean | seed sd |
+|---|---|---|---|---|---|---|---|
+| pick 1 (0.97097) | 0.8730 | 0.9364 | 0.8423 | 0.9966 | 0.9984 | 0.9294 | 0.0024 |
+| + stage-2 column matching | 0.8768 | 0.9348 | 0.8405 | 0.9969 | 0.9985 | 0.9295 | 0.0054 |
+
+Flat on the Kaggle-aligned short windows (+0.0003 / +0.0001); seed-to-seed spread about doubles,
+since each tree now sees fewer of the strong columns.
+
+**Pre-registered rule:** replace pick 1 only if public AUC ≥ **0.9740** (0.97097 + 0.003) *and*
+there is time to rebuild and verify the notebook before the deadline.
+
+| File | Public AUC |
+|---|---|
+| `submission_nbr_stack_wide_2hopw_chain_shift_s2reg_hl14.csv` | **0.97190** (2026-10-24) |
+
+**Result.** 0.97190, +0.0009 vs pick 1 (0.97097); test rank ρ 0.995 → proxy paired SE 0.0008
+(calibrated ≈ 0.0015), z ≈ +1.2 (≈ +0.6). Below the pre-registered 0.9740, so not a proven gain;
+the best public score of the project and the fourth consecutive small positive move (chain +0.0004,
+shift +0.0016, two-hop-25 +0.0008, stage-2 matching +0.0009). Gap to the top (0.97446): 0.0026,
+≈ 0.33 public SE. Seed spread locally doubled (0.0054 vs 0.0024).
+
+## 44. Round 16: stage-2 settings pushed further (2026-10-24, last day)
+
+Both build on the stage-2 matched model (public 0.97190) via the new `stage2_overrides` option
+(final stage only; 1 new test, 51 pass):
+
+| Variant | Stage-2 change | Test rank ρ vs 0.97190 model | ρ vs pick 2 (chain) |
+|---|---|---|---|
+| V1 `…_s2c20_hl14` | column share 0.20 (~66 columns per tree), 750 trees | 0.994 | 0.974 |
+| V2 `…_s2l8_hl14` | column matching kept (0.32), L2 penalty 2 → 8 | 0.991 | 0.969 |
+
+Local check (2 seeds; `artifacts/round3/round16_*.csv`):
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean | seed sd |
+|---|---|---|---|---|---|---|---|
+| stage-2 matched (0.97190) | 0.8768 | 0.9348 | 0.8405 | 0.9969 | 0.9985 | 0.9295 | 0.0054 |
+| V1 columns 0.20, 750 trees | 0.8687 | 0.9302 | 0.8421 | **0.9973** | **0.9987** | 0.9274 | 0.0040 |
+| V2 L2 8 | 0.8684 | 0.9291 | 0.8474 | 0.9967 | 0.9984 | 0.9280 | **0.0028** |
+
+Short windows: V1 +0.0004 / +0.0002, V2 −0.0002 / −0.0001 (all within noise). V2 is the steadiest
+across seeds (sd 0.0028, close to the pre-matching 0.0024).
+
+V1 and V2 rank ρ 0.987 with each other. **Pre-registered rule:** replace pick 1 only if public AUC
+≥ **0.9749** (0.97190 + 0.003). This is the last modelling round.
+
+| File | Public AUC |
+|---|---|
+| `submission_nbr_stack_wide_2hopw_chain_shift_s2c20_hl14.csv` (V1) | **0.97131** (2026-10-24) |
+| `submission_nbr_stack_wide_2hopw_chain_shift_s2l8_hl14.csv` (V2) | **0.97136** (2026-10-24) |
+
+**Result.** V1 −0.0006 and V2 −0.0005 vs the 0.97190 model (z ≈ −0.3 to −0.7 after calibration):
+both null. Three stage-2 settings (column share 0.32, 0.20; L2 2, 8) span 0.97131–0.97190, a
+0.0006 band, well inside the noise of a paired public comparison. The stage-2 settings axis is
+flat; the +0.0009 of column matching (§43) is as likely a favourable draw as a real gain.
+
+**Model development is complete.** Since round 6, 21 submissions have explored reach, detail,
+shape, weighting and stage-2 settings; the best public score moved 0.96814 → 0.97190 in steps that
+were each within noise. Final private picks:
+
+| Pick | File | Public |
+|---|---|---|
+| 1 | `submission_nbr_stack_wide_2hopw_chain_shift_s2reg_hl14.csv` | 0.97190 |
+| 2 | `submission_nbr_stack_wide_2hop_chain_hl14.csv` | 0.96858 |
+
+Pick 1 is a tie with V1, V2 and the 0.97097 model; the highest public score is kept at no expected
+private cost and so that the notebook reproduces the top submission. Pick 2 remains the most
+different strong model (ρ 0.969–0.983 with all pick-1 candidates).

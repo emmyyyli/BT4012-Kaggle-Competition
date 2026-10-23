@@ -7,6 +7,10 @@ and is then judged on the Kaggle public leaderboard. Variants:
 ``recent_K``      train only on the last K labeled time steps before the cut-off
 ``halflife_H``    exponential recency weights with half-life H steps (mean-one weights)
 ``temporal_bag``  rank-average of models trained on all steps, the last 25 and the last 15
+``nbr_stack_wide_2hopw_chain_shift_s2c20_hl14`` / ``_s2l8_``
+                  round-16: stage 2 with 20% columns per tree and 750 trees; stage-2 column matching + L2 8
+``nbr_stack_wide_2hopw_chain_shift_s2reg_hl14``
+                  round-15: final model with stage-2 feature fraction scaled to stage 1's column count
 ``nbr_stack_wide_2hopw_max_chain_shift_hl14``
                   round-14: final model + highest stage-1 score among two-hop endpoints
 ``nbr_stack_wide_2hopw_chain_shift_hl14``
@@ -132,6 +136,10 @@ def variants():
     registry["nbr_stack_wide_2hop_chain_shift_hl14"] = make_neighbour_stack(**pick1, chain=True, shift_weights=True)
     registry["nbr_stack_wide_2hopw_chain_shift_hl14"] = make_neighbour_stack(**pick1, chain=True, shift_weights=True, two_hop_wide=True)
     registry["nbr_stack_wide_2hopw_max_chain_shift_hl14"] = make_neighbour_stack(**pick1, chain=True, shift_weights=True, two_hop_wide=True, two_hop_max=True)
+    registry["nbr_stack_wide_2hopw_chain_shift_s2reg_hl14"] = make_neighbour_stack(**pick1, chain=True, shift_weights=True, two_hop_wide=True, stage2_match_features=True)
+    final = dict(**pick1, chain=True, shift_weights=True, two_hop_wide=True)
+    registry["nbr_stack_wide_2hopw_chain_shift_s2c20_hl14"] = make_neighbour_stack(**final, stage2_overrides={"colsample_bytree": 0.20, "n_estimators": 750})
+    registry["nbr_stack_wide_2hopw_chain_shift_s2l8_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, stage2_overrides={"reg_lambda": 8.0})
     registry["nbr_stack_rich_2hop_prop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, propagate=True)
     return registry
 
