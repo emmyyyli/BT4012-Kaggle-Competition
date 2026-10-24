@@ -51,7 +51,7 @@ experiments that led to these choices are run by the scripts in `src/` and recor
   look like the test period (covariate-shift importance weights from a train-vs-test
   classifier, computed after removing the 30 features that most strongly encode time).
 * Both stages use a tuned, shallow LightGBM; the configuration is in `src/final_config.py`
-  (Kaggle public ROC-AUC 0.97190).
+  (Kaggle public ROC-AUC 0.97196).
 """),
     code("""
 from pathlib import Path
@@ -179,6 +179,8 @@ than on the aggregated group.
    and of the same 25 features; and label-free chain shape from the full
    edge list: longest payment path into / out of the transaction, a peel-like flag (one funder,
    at most two spenders) and the length of the unbroken peel run before / after it.
+   Contrast features: for each of the 25 key features, the transaction's own value minus the
+   mean over its labeled neighbours.
 3. **Stage 2** — the same LightGBM on supplied features + graph context, except that each tree
    samples a share of columns scaled by 165 / (number of stage-2 columns), so it sees about as
    many columns (about 106) as a stage-1 tree.

@@ -83,11 +83,14 @@ SUBMISSIONS = [
     (12, "+ test-similarity weights", 0.9702, True),
     (13, "+ two-hop over 25 features", 0.97097, True),
     (14, "two-hop max score", 0.97085, False),
-    (15, "+ stage-2 column matching (final)", 0.97190, True),
+    (15, "+ stage-2 column matching", 0.97190, True),
     (16, "stage-2 fewer columns", 0.97131, False),
     (16, "stage-2 stronger L2", 0.97136, False),
+    (17, "pruned stage 2 (151 features)", 0.97176, False),
+    (18, "+ contrast features (final)", 0.97196, True),
+    (19, "re-tuned settings (more capacity)", 0.96207, False),
 ]
-LEADER_AUC = 0.97446
+LEADER_AUC = 0.97582
 PUBLIC_SE = 0.0077  # Hanley-McNeil SE of one public AUC (~270 illicit rows), findings 20.2
 
 
@@ -178,7 +181,7 @@ def figure_public_auc(path):
     notes = {
         "tuned LightGBM": (6, -11, "left"), "recency weights": (-5, 9, "right"), "neighbour stacking": (4, -12, "left"),
         "stack + rich context": (-5, 9, "right"), "wide + two-hop": (-8, 7, "right"),
-        "+ stage-2 column matching (final)": (4, -42, "right"),
+        "+ contrast features (final)": (4, -42, "right"), "re-tuned settings (more capacity)": (-6, -10, "right"),
         "aggregated-only": (7, 0, "left"), "0.7 LightGBM + 0.3 GraphSAGE": (7, 0, "left"), "3-hop propagation": (0, -13, "center"),
     }
     for _, row in frame.iterrows():

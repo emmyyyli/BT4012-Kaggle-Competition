@@ -49,6 +49,19 @@ TUNED_LGBM_PARAMS = dict(
     reg_lambda=2.035593509388961,
 )
 
+# Re-tuned on the window that tracks Kaggle (train <= 28 -> validate 29-35; report/findings.md
+# section 48): median / geometric median of the top 5 of 20 Optuna trials of the full final stack.
+RETUNED_LGBM_PARAMS = dict(
+    n_estimators=878,
+    learning_rate=0.04424664598342847,
+    num_leaves=21,
+    min_child_samples=69,
+    colsample_bytree=0.5220140630148021,
+    subsample=0.7909048859615884,
+    subsample_freq=1,
+    reg_lambda=0.7177811772723194,
+)
+
 DEFAULT_XGB_PARAMS = dict(
     n_estimators=600,
     learning_rate=0.03,

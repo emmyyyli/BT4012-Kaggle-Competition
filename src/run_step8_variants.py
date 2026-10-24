@@ -152,6 +152,11 @@ def variants():
     registry["nbr_stack_wide_2hopw_chain_shift_s2reg_rf100_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, stage2_rf_weight=1.0)
     registry["nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, contrast=True)
     registry["nbr_stack_wide_2hopw_chain_shift_s2reg_rank_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, stage2_rank_objective=True)
+    registry["nbr_stack_wide_2hopw_chain_shift_s2reg_hl7"] = make_neighbour_stack(**{**final, "half_life_steps": 7}, stage2_match_features=True)
+    registry["nbr_stack_wide_2hopw_chain_shift_s2reg_hl10"] = make_neighbour_stack(**{**final, "half_life_steps": 10}, stage2_match_features=True)
+    from src.model_zoo import RETUNED_LGBM_PARAMS
+    registry["nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, base_params=RETUNED_LGBM_PARAMS)
+    registry["nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl7"] = make_neighbour_stack(**{**final, "half_life_steps": 7}, stage2_match_features=True, base_params=RETUNED_LGBM_PARAMS)
     registry["nbr_stack_rich_2hop_prop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, propagate=True)
     return registry
 

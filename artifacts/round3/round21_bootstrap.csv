@@ -1,0 +1,16 @@
+candidate,window,delta_ci_2_5,delta_ci_97_5,prob_delta_positive
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,t14_v15-35,-0.025162057416855017,-0.018675130217624555,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl14,t14_v15-35,-0.03921625639461072,-0.029894184296438548,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl7,t14_v15-35,-0.04103292183253329,-0.03192991400442992,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,t21_v22-28,-0.029338964774976023,-0.01708185098241428,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl14,t21_v22-28,-0.02802830801133066,-0.015778505852629285,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl7,t21_v22-28,-0.030221304285686958,-0.017089931918630265,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,t21_v22-35,-0.07880785148462915,-0.06485595502345744,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl14,t21_v22-35,-0.08638793607384486,-0.06971592632377549,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl7,t21_v22-35,-0.09383818500508034,-0.07569018324878503,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,t25_v26-35,0.0008181110543855008,0.002273081316825511,1.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl14,t25_v26-35,0.0016823485389226762,0.0035000761625062463,1.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl7,t25_v26-35,0.0019542876180453665,0.003806745704575251,1.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,t28_v29-35,0.0018719577086330902,0.003114191906728513,1.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl14,t28_v29-35,0.0022773825188445646,0.003869401562749755,1.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl7,t28_v29-35,0.0022314881993379192,0.0038429329282337636,1.0

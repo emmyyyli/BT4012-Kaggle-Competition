@@ -1,0 +1,6 @@
+t28_v29-35 best_trial: mean 0.99906 sd 0.00001
+t28_v29-35 consensus_top5: mean 0.99906 sd 0.00002
+t28_v29-35 consensus_top5_hl7: mean 0.99906 sd 0.00006
+t25_v26-35 best_trial: mean 0.99812 sd 0.00005
+t25_v26-35 consensus_top5: mean 0.99785 sd 0.00004
+t25_v26-35 consensus_top5_hl7: mean 0.99818 sd 0.00010

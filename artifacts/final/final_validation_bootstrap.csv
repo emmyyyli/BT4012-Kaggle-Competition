@@ -1,6 +1,6 @@
 candidate,window,delta_ci_2_5,delta_ci_97_5,prob_delta_positive
-nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,t14_v15-35,-0.029726861706297802,-0.02344406950756488,0.0
-nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,t21_v22-28,-0.027773082142844026,-0.018453910488958135,0.0
-nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,t21_v22-35,-0.0774133467559294,-0.06424495973512703,0.0
-nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,t25_v26-35,0.000804573516417989,0.0020289952423526328,1.0
-nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,t28_v29-35,0.0019003048053437166,0.0033300644853891453,1.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14,t14_v15-35,-0.03662278503416143,-0.029365107283504097,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14,t21_v22-28,-0.031103262991740575,-0.021063300516373958,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14,t21_v22-35,-0.06525424584352371,-0.053396676166413595,0.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14,t25_v26-35,0.0007894444731921997,0.0020602759817453025,1.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14,t28_v29-35,0.0019053052704379014,0.003347510332277007,1.0

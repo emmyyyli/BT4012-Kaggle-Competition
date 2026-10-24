@@ -1,0 +1,13 @@
+  t25_v26-35
+  t28_v29-35
+window                                       t25_v26-35  t28_v29-35    mean
+candidate                                                                  
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl7       0.9975      0.9988  0.9981
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl10      0.9972      0.9987  0.9980
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl14      0.9969      0.9986  0.9977
+tuned_lgbm_all                                   0.9954      0.9960  0.9957
+                                  candidate  mean_roc_auc  worst_roc_auc  mean_delta_vs_baseline  min_window_delta  windows_improved  windows  mean_seed_auc_std  adopt
+ nbr_stack_wide_2hopw_chain_shift_s2reg_hl7        0.9981         0.9975                  0.0024            0.0021                 2        2             0.0001   True
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl10        0.9980         0.9972                  0.0023            0.0019                 2        2             0.0001   True
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl14        0.9977         0.9969                  0.0020            0.0015                 2        2             0.0000   True
+                             tuned_lgbm_all        0.9957         0.9954                  0.0000            0.0000                 0        2             0.0002  False

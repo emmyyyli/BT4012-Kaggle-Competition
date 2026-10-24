@@ -27,7 +27,7 @@ python -m pytest                     # unit tests
 ```
 
 The final model is defined in [`src/final_config.py`](src/final_config.py) and implemented
-in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.97190**):
+in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.97196**):
 
 1. **Stage 1:** a tuned, shallow LightGBM (9 leaves, 500 trees) on the 165 supplied features
    scores labeled training rows out-of-fold (5 folds of consecutive time steps) and test rows
@@ -36,7 +36,8 @@ in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.97190**)
    mean/max/in-mean/out-mean, degrees, labeled-neighbour count and share, and
    mean/max/std/in-mean/out-mean of the 25 most influential supplied features. Walk-weighted means (stage-1 score and the same 25 features) over labeled nodes two hops away are added; walks
    may pass through featureless nodes. Label-free payment-chain shape from the full edge list
-   (longest payment path into / out of the transaction, peel-chain runs) is added as well.
+   (longest payment path into / out of the transaction, peel-chain runs) and contrast features
+   (own value minus labeled-neighbour mean for the 25 key features) are added as well.
 3. **Stage 2:** the same LightGBM on supplied features plus graph context, with its column
    share scaled by 165/330 so each tree sees about as many columns as a stage-1 tree.
 4. **Weighting and seeds:** every fit weights training rows toward recent steps (half-life
@@ -98,8 +99,11 @@ features. Every graph feature is therefore computed the same way in training and
 | `nbr_stack_wide_2hop_chain_shift_hl14` (+ test-similarity importance weights) | 0.9702 |
 | `nbr_stack_wide_2hopw_chain_shift_hl14` (+ two-hop means over all 25 features) | 0.97097 |
 | `nbr_stack_wide_2hopw_max_chain_shift_hl14` (+ two-hop max score) | 0.97085 |
-| `nbr_stack_wide_2hopw_chain_shift_s2reg_hl14` (+ stage-2 column matching, **final model**, private pick 1) | **0.97190** |
+| `nbr_stack_wide_2hopw_chain_shift_s2reg_hl14` (+ stage-2 column matching) | 0.97190 |
 | `…_s2c20_hl14` / `…_s2l8_hl14` (stage 2: fewer columns / stronger L2) | 0.97131 / 0.97136 |
+| `…_s2reg_prune95_hl14` (stage 2 pruned to 151 features; private pick 2) | 0.97176 |
+| `…_s2reg_contrast_hl14` (+ contrast features, **final model**, private pick 1) | **0.97196** |
+| `…_s2reg_retuned_hl14` (settings re-tuned for more capacity) | 0.96207 |
 
 Full commentary for every round is in `report/findings.md`.
 

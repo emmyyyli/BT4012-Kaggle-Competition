@@ -1993,3 +1993,98 @@ size of local gap that matched a real public gap). New harness options `--window
 Neither clears the bar, so the last two submissions are left unused. Modelling is closed.
 Final picks: pick 1 `submission_nbr_stack_wide_2hopw_chain_shift_s2reg_hl14.csv` (0.97190), pick 2
 `submission_nbr_stack_wide_2hopw_chain_shift_s2reg_prune95_hl14.csv` (0.97176).
+
+**Round 19 public check.** The contrast-features variant scored **0.97196** (+0.00006 vs 0.97190),
+exactly the local screen's +0.00006: the predictive window and the public LB agree on this tie.
+
+## 48. Re-tuning the shared LightGBM settings on the window that tracks Kaggle (2026-10-24)
+
+**Why.** `TUNED_LGBM_PARAMS` (step 4, §8) were tuned on the mean of ≤14→15–21, ≤18→19–25 and
+≤21→22–28. §46 showed that windows of this kind rank models almost opposite to Kaggle (≤21→22–28:
+Spearman −0.80), so every model since round 4 has used settings partly optimised for the wrong
+target. The "shallow trees resist drift" conclusion came from those windows.
+
+**Half-life screen** (3 seeds, current settings; `artifacts/round3/round20_*.csv`):
+
+| Half-life | ≤28→29–35 | ≤25→26–35 |
+|---|---|---|
+| 14 (current) | 0.99852 | 0.99680 |
+| 10 | 0.99865 | 0.99718 |
+| 7 | 0.99876 | 0.99744 |
+
+A consistent trend toward shorter half-lives, but below the +0.0004 bar on its own.
+
+**Re-tune** (`src/run_step9_retune.py`; 20 Optuna TPE trials of the full final stack on ≤28→29–35,
+seed 0, current settings enqueued as trial 0; `artifacts/tuning/step9_retune.json`). The current
+settings ranked **19th of 20** (0.99843); 12 trials beat them by ≥ +0.0004. The winners share more
+capacity: 700–1,100 trees at learning rate 0.04–0.06 (vs 500 at 0.025), 15–31 leaves (vs 9),
+L2 0.5–1.5 (vs 2). Top-5 consensus (median, geometric median for rates) = `RETUNED_LGBM_PARAMS`:
+878 trees, learning rate 0.044, 21 leaves, min leaf 69, feature share 0.52, row share 0.79, L2 0.72.
+
+**Confirmation** (3 seeds; ≤25→26–35 took no part in tuning):
+
+| Candidate | ≤28→29–35 | Δ | ≤25→26–35 | Δ |
+|---|---|---|---|---|
+| current | 0.99852 | — | 0.99680 | — |
+| best single trial | 0.99906 | +0.00054 | 0.99812 | +0.00132 |
+| **top-5 consensus** | **0.99906** | **+0.00054** | **0.99785** | **+0.00105** |
+| consensus + half-life 7 | 0.99906 | +0.00054 | 0.99818 | +0.00138 |
+
+All pass the pre-set rule (≥ +0.0004 on ≤28→29–35, no loss on ≤25→26–35), and the untouched
+window improves by about twice as much. Submitted candidate: top-5 consensus, half-life 14
+(`nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl14`): one change, least tailored to one window.
+
+**Full check before using the last slot** (2 seeds, five windows; `artifacts/round3/round21_*.csv`):
+
+| Model | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | seed sd |
+|---|---|---|---|---|---|---|
+| current (0.97190) | 0.8768 | 0.9348 | 0.8405 | 0.9969 | 0.9985 | 0.0054 |
+| re-tuned, half-life 14 | 0.8642 | 0.9361 | 0.8345 | **0.9979** | **0.9991** | **0.0027** |
+| re-tuned, half-life 7 | 0.8625 | 0.9340 | 0.8276 | 0.9982 | 0.9991 | 0.0047 |
+
+Within-step AUC change of the re-tuned model by forecast horizon (steps after the training cut-off,
+weighted by illicit count, pooled over the four non-overlapping windows): 1–3 steps −0.003, 4–7
++0.0003, 8–10 −0.006, 11–14 +0.003, 15–21 −0.013. So the re-tuned model's gain on the two short
+windows comes mainly from ordering transactions *between* time steps (pooled AUC), not from better
+ranking *within* each step, and it loses on the long windows (which rank models opposite to Kaggle,
+§46). It halves the seed spread. Verdict: the best-supported candidate, at moderate rather than high
+confidence; half-life 7 adds nothing beyond it.
+
+**Pre-registered decision (set before the score is known):** given two independent local windows in
+agreement, adopt as pick 1 if public ≥ **0.9734** (0.97196 + 0.0015, about one calibrated paired SE),
+with the 0.97190 model (old settings) as pick 2, which then hedges the settings change. Otherwise
+keep the current picks.
+
+| File | Public AUC |
+|---|---|
+| `submission_nbr_stack_wide_2hopw_chain_shift_s2reg_retuned_hl14.csv` | **0.96207** (2026-10-24) |
+
+## 49. The re-tune failed on Kaggle; final picks (2026-10-24)
+
+The re-tuned model scored **0.96207**, −0.0099 vs the best (0.97196). With test rank ρ 0.84 the proxy
+paired SE is about 0.0044 (z ≈ −2.2): a real loss, the largest since the GraphSAGE blend.
+
+**Why the local evidence misled.**
+1. **The predictive window was calibrated on similar models only.** Its +0.81 agreement with Kaggle
+   (§46) was measured across variants of one shallow configuration (test rank ρ ≥ 0.98 with each
+   other). The re-tuned model is a different regime (ρ 0.84), and the agreement did not extrapolate.
+2. **The gain came from the fragile part.** The re-tuned model improved *pooled* AUC on the short
+   windows by ordering transactions *between* time steps better, while ranking *within* steps was
+   mixed (§48). Between-step ordering learned from steps 1–35 does not survive the test period, where
+   the illicit share collapses after the step-43 market shutdown.
+3. **The warning signs were there:** it lost on both long windows (−0.006 to −0.013), was very
+   over-confident (median score 0.00001 vs 0.002), and moved the ranking far more than any earlier
+   change. Shallow, regularised trees (§8) were the right choice for a distant, drifting test period
+   after all; tuning more capacity on the nearest window overfitted the near future.
+4. **Lesson:** a validation proxy is only trustworthy within the range of models it was checked on.
+   Large changes need evidence that does not rely on one proxy.
+
+**Final private picks** (all candidates within noise of each other; the shallow settings stay):
+
+| Pick | File | Public | Why |
+|---|---|---|---|
+| 1 | `submission_nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14.csv` | 0.97196 | best public; notebook switched to reproduce it |
+| 2 | `submission_nbr_stack_wide_2hopw_chain_shift_s2reg_prune95_hl14.csv` | 0.97176 | steadiest (seed sd 0.0016), different feature set (ρ 0.993 with pick 1) |
+
+The 0.97190 model is not picked: it is a near-duplicate of pick 1 (ρ 0.9985). The deliverables
+(`FINAL_STACK` + `contrast: True`, notebook, report) are switched to pick 1.

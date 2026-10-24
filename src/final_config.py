@@ -1,7 +1,7 @@
 """Version-controlled settings for the final submission model.
 
 ``python -m src.train`` and ``e1304439.ipynb`` read this file to reproduce the submission
-without re-running any search. Selection evidence: report/findings.md (sections 14-20, 35, 37-44).
+without re-running any search. Selection evidence: report/findings.md (sections 14-20, 35, 37-49).
 
 Final model: two-stage graph stacking (``src/graph_stacking.py``) with tuned LightGBM in both
 stages, half-life-14 recency weights, one-hop labeled-neighbour context ("rich": structure
@@ -11,20 +11,21 @@ runs), with every fit's sample weights also multiplied by covariate-shift import
 ("shift_weights": how test-like each training row looks, after removing the 30 most
 time-encoding features). In stage 2 only, each tree samples columns in proportion to the 165
 supplied features (``stage2_match_features``), about 106 per tree, as in stage 1. Kaggle public
-ROC-AUC 0.97190. Each seed repeats both stages; seed predictions are averaged. Without the
-stage-2 column matching it scored 0.97097; with two-hop means over 5 features only, 0.9702; without
+ROC-AUC 0.97196 with own-minus-neighbour-mean contrast features (``contrast``), 0.97190 without.
+Each seed repeats both stages; seed predictions are averaged. Without the stage-2 column
+matching it scored 0.97097; with two-hop means over 5 features only, 0.9702; without
 ``shift_weights`` as well, 0.96858 (the second private pick, ``SECOND_PICK_NAME``);
 report/findings.md sections 35-41.
 """
 
 from src.model_zoo import SHALLOW_LGBM_PARAMS, TUNED_LGBM_PARAMS
 
-FINAL_NAME = "nbr_stack_wide_2hopw_chain_shift_s2reg_hl14"
+FINAL_NAME = "nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14"
 FINAL_SEEDS = tuple(range(10))
 
 # Arguments for ``graph_stacking.make_neighbour_stack``.
 FINAL_STACK = {"half_life_steps": 14, "rich": True, "wide": True, "two_hop": True, "chain": True, "shift_weights": True,
-               "two_hop_wide": True, "stage2_match_features": True}
+               "two_hop_wide": True, "stage2_match_features": True, "contrast": True}
 
 # Simpler alternative (public 0.96668): the same pipeline without the 25-feature "wide" stats.
 ALTERNATIVE_NAME = "nbr_stack_rich_2hop_hl14"

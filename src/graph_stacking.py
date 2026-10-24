@@ -536,7 +536,7 @@ def make_neighbour_stack(
     half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False, forward_oof=False,
     hub=False, chain=False, centrality=False, shift_weights=False, two_hop_wide=False, two_hop_max=False,
     stage2_match_features=False, stage2_overrides=None, stage2_keep=None, stage2_rf_weight=0.0,
-    contrast=False, stage2_rank_objective=False,
+    contrast=False, stage2_rank_objective=False, base_params=None,
 ):
     """Two-stage stacking over labeled neighbours.
 
@@ -562,6 +562,8 @@ def make_neighbour_stack(
     return the rank average (1 - w) * rank(LightGBM) + w * rank(RF). 0 = LightGBM only.
     ``contrast``: add, for each WIDE_NEIGHBOUR_FEATURES column, the transaction's own value minus
     the mean over its labeled neighbours (requires ``wide``).
+    ``base_params``: LightGBM settings for every fit (default TUNED_LGBM_PARAMS); stage-2 options
+    are applied on top of them.
     ``stage2_rank_objective``: fit the final stage as a LightGBM ranker (``rank_xendcg``, one
     query per time step) instead of a classifier; returns percentile ranks of its scores.
     ``propagate``: add 3-hop label-free score propagation (``propagation_features``).
@@ -595,7 +597,7 @@ def make_neighbour_stack(
         return weights
 
     def fit(frame, columns, seed, reference_step, params=None):
-        return _fit(frame, columns, seed, row_weights(frame, reference_step), params)
+        return _fit(frame, columns, seed, row_weights(frame, reference_step), base_params if params is None else params)
 
     def out_of_fold(train, target, columns, seed, reference, score_target):
         """Out-of-fold scores for ``train`` (folds = blocks of time steps) + fold models' target scores."""
@@ -670,7 +672,7 @@ def make_neighbour_stack(
             stacked_columns = [column for column in stacked_columns if column in keep]
         stage2_params = None
         if stage2_match_features or stage2_overrides:
-            stage2_params = dict(TUNED_LGBM_PARAMS)
+            stage2_params = dict(TUNED_LGBM_PARAMS if base_params is None else base_params)
             if stage2_match_features:
                 stage2_params["colsample_bytree"] *= len(columns) / len(stacked_columns)
             stage2_params.update(stage2_overrides or {})
