@@ -7,6 +7,10 @@ and is then judged on the Kaggle public leaderboard. Variants:
 ``recent_K``      train only on the last K labeled time steps before the cut-off
 ``halflife_H``    exponential recency weights with half-life H steps (mean-one weights)
 ``temporal_bag``  rank-average of models trained on all steps, the last 25 and the last 15
+``nbr_stack_wide_2hopw_chain_shift_s2reg_rf50_hl14`` / ``_rf100_``
+                  round-18: final model rank-blended 50/50 with a stage-2 Random Forest; RF alone (diagnostic)
+``nbr_stack_wide_2hopw_chain_shift_s2reg_prune95_hl14``
+                  round-17: final model with stage 2 restricted to the 151 features carrying 95% of influence
 ``nbr_stack_wide_2hopw_chain_shift_s2c20_hl14`` / ``_s2l8_``
                   round-16: stage 2 with 20% columns per tree and 750 trees; stage-2 column matching + L2 8
 ``nbr_stack_wide_2hopw_chain_shift_s2reg_hl14``
@@ -140,6 +144,10 @@ def variants():
     final = dict(**pick1, chain=True, shift_weights=True, two_hop_wide=True)
     registry["nbr_stack_wide_2hopw_chain_shift_s2c20_hl14"] = make_neighbour_stack(**final, stage2_overrides={"colsample_bytree": 0.20, "n_estimators": 750})
     registry["nbr_stack_wide_2hopw_chain_shift_s2l8_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, stage2_overrides={"reg_lambda": 8.0})
+    from src.stage2_features import STAGE2_KEEP_95
+    registry["nbr_stack_wide_2hopw_chain_shift_s2reg_prune95_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, stage2_keep=STAGE2_KEEP_95)
+    registry["nbr_stack_wide_2hopw_chain_shift_s2reg_rf50_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, stage2_rf_weight=0.5)
+    registry["nbr_stack_wide_2hopw_chain_shift_s2reg_rf100_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, stage2_rf_weight=1.0)
     registry["nbr_stack_rich_2hop_prop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, propagate=True)
     return registry
 

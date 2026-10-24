@@ -1885,3 +1885,88 @@ were each within noise. Final private picks:
 Pick 1 is a tie with V1, V2 and the 0.97097 model; the highest public score is kept at no expected
 private cost and so that the notebook reproduces the top submission. Pick 2 remains the most
 different strong model (ρ 0.969–0.983 with all pick-1 candidates).
+
+## 45. Feature contribution of the final model, and round 17: pruned stage 2 (2026-10-24)
+
+**Contribution** (seed 0 fit of the 0.97190 model on all labeled rows; mean |TreeSHAP| share on
+test rows; `artifacts/report/final_model_feature_importance.csv`). 330 stage-2 features:
+29 carry 50% of influence, 114 carry 90%, 151 carry 95%, 228 carry 99%; 187 features are each
+below 0.1% and 52 are never used in a split. 81 of the 165 engineered features have a
+near-duplicate (Spearman |ρ| > 0.95 on training rows).
+
+| Group | n | Test share | n below 0.1% |
+|---|---|---|---|
+| supplied local | 93 | 0.432 | 41 |
+| supplied aggregated | 72 | 0.256 | 36 |
+| wide one-hop statistics | 125 | 0.173 | 88 |
+| two-hop context | 27 | 0.095 | 16 |
+| neighbour scores | 4 | 0.033 | 0 |
+| chain shape | 5 | 0.009 | 3 |
+| structure | 4 | 0.002 | 3 |
+
+Within the wide statistics the incoming means carry only 1.5% (mostly duplicates of the plain
+mean). A few features matter 3–4× more on test than on training rows (`nbrw_mean_feat_2`,
+`hop2_mean_feat_3`, `nbrw_out_mean_feat_106`, `feat_136`): the model leans harder on some
+drift-prone signals in the test period.
+
+**Round 17 variant** `nbr_stack_wide_2hopw_chain_shift_s2reg_prune95_hl14`: stage 2 restricted to
+the 151 features carrying 95% of influence (91 supplied, 60 engineered; `src/stage2_features.py`),
+stage 1 and graph context unchanged, column matching on (~106 columns per tree). Selected from
+test-row features only, no labels. 1 new test, 52 pass. Test rank ρ 0.994 with the 0.97190 model,
+0.980 with pick 2. Caveat: the list was chosen with a model fitted on all labeled rows, so its
+local check is mildly optimistic.
+
+Local check (2 seeds; `artifacts/round3/round17_*.csv`):
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | ≤28→29–35 | mean | seed sd |
+|---|---|---|---|---|---|---|---|
+| 0.97190 model (330 features) | 0.8768 | 0.9348 | 0.8405 | 0.9969 | 0.9985 | 0.9295 | 0.0054 |
+| pruned (151 features) | 0.8720 | **0.9450** | **0.8778** | **0.9974** | **0.9986** | **0.9382** | **0.0016** |
+
+Short windows +0.0005 / +0.0001; the long window ≤21→22–35 rises by +0.037, the largest local
+change of any graph variant, and seed spread falls from 0.0054 to 0.0016 (the steadiest graph
+model so far). Both are consistent with removing noisy, redundant columns, but the long-window jump
+is partly inflated by the selection caveat above, and long windows have mispredicted Kaggle seven
+times.
+
+**Pre-registered rule:** replace pick 1 only if public AUC ≥ **0.9749**.
+
+| File | Public AUC |
+|---|---|
+| `submission_nbr_stack_wide_2hopw_chain_shift_s2reg_prune95_hl14.csv` | **0.97176** (2026-10-24) |
+
+**Result.** 0.97176, −0.0001 vs the 0.97190 model (ρ 0.994): a tie. Removing 179 of 330 stage-2
+features changes nothing on the public score while cutting seed spread from 0.0054 to 0.0016.
+Redundant features added variance, not ranking error.
+
+## 46. Which local window predicts Kaggle, and round 18: stage-2 Random Forest blend (2026-10-24)
+
+**Local windows vs public score** (Spearman over variants with both; window tables of rounds 3–17):
+
+| Window | All 24 variants | Graph stacks (21) | Since round 6 (14) |
+|---|---|---|---|
+| ≤14→15–35 | −0.92 | −0.90 | −0.73 |
+| ≤21→22–28 | −0.80 | −0.70 | −0.13 |
+| ≤21→22–35 | −0.86 | −0.80 | −0.48 |
+| ≤25→26–35 | +0.46 | +0.22 | +0.09 |
+| **≤28→29–35** | **+0.81** | **+0.72** | **+0.83** |
+| mean of 5 windows | −0.87 | −0.81 | −0.42 |
+
+The most recent window ranks variants like Kaggle, even among the near-tied recent ones; the long
+windows rank them almost in reverse, and the 5-window mean (the original adoption rule) is
+anti-correlated. A better local selector therefore already existed: the window closest to the test
+period. Caveats: post hoc, 2 seeds per variant, 24 related variants.
+
+**Round 18** (`stage2_rf_weight`; 1 new test, 53 pass). A Random Forest (500 trees, √features,
+min leaf 5, balanced-subsample weights, same recency × shift row weights) on the same stage-2
+features as the 0.97190 model; Random Forest is the strongest model in the literature on this data
+(Weber et al. 2019; Maganti 2026).
+
+| Variant | ≤14→15–35 | ≤21→22–28 | ≤21→22–35 | ≤25→26–35 | **≤28→29–35** | seed sd |
+|---|---|---|---|---|---|---|
+| 0.97190 model | 0.8768 | 0.9348 | 0.8405 | 0.9969 | **0.9985** | 0.0054 |
+| 50/50 rank blend with RF | 0.8649 | 0.9360 | 0.8361 | 0.9968 | 0.9984 | 0.0058 |
+| RF alone (stage 2) | 0.8536 | 0.9291 | 0.8313 | 0.9955 | 0.9977 | 0.0075 |
+
+On the predictive window the RF alone is clearly weaker (−0.0008) and the blend flat (−0.0001), with
+higher seed spread. Not submitted: the predictive window gives no reason to expect a gain.

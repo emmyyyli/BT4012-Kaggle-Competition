@@ -351,3 +351,48 @@ def test_stage2_overrides_apply_to_final_stage_only(monkeypatch):
     assert all(params is None for params in seen[:-1])
     assert seen[-1]["reg_lambda"] == 8.0
     assert seen[-1]["colsample_bytree"] < gs.TUNED_LGBM_PARAMS["colsample_bytree"]  # matching still applied
+
+
+def test_stage2_keep_restricts_final_stage_columns_only(monkeypatch):
+    import src.graph_stacking as gs
+
+    columns = ["feat_1", "feat_2", *gs.RICH_NEIGHBOUR_FEATURES]
+    train = _frame(np.repeat(np.arange(1, 11), 30), 0)
+    target = _frame(np.repeat([11, 12], 20), 1)
+    for frame in (train, target):
+        for column in gs.RICH_NEIGHBOUR_FEATURES:
+            frame[column] = np.arange(len(frame), dtype=float)
+    ids = [*train["txId"], *target["txId"]]
+    graph = build_graph(pd.DataFrame({"txId1": ids[:-1], "txId2": ids[1:]}))
+    seen = []
+    real_fit = gs._fit
+
+    def recording_fit(frame, cols, seed, weights=None, params=None):
+        seen.append(list(cols))
+        return real_fit(frame, cols, seed, weights, params)
+
+    monkeypatch.setattr(gs, "_fit", recording_fit)
+    keep = ["feat_1", "nbr_score_mean", "hop2_score_mean"]
+    gs.make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, stage2_keep=keep)(train, target, columns, 0, graph)
+
+    assert all(cols == columns for cols in seen[:-1])  # stage 1 keeps every supplied feature
+    assert seen[-1] == keep
+
+
+def test_stage2_random_forest_blend_returns_rank_scores():
+    from src.graph_stacking import RICH_NEIGHBOUR_FEATURES, make_neighbour_stack
+
+    columns = ["feat_1", "feat_2", *RICH_NEIGHBOUR_FEATURES]
+    train = _frame(np.repeat(np.arange(1, 11), 30), 0)
+    target = _frame(np.repeat([11, 12], 20), 1)
+    for frame in (train, target):
+        for column in RICH_NEIGHBOUR_FEATURES:
+            frame[column] = np.arange(len(frame), dtype=float)
+    ids = [*train["txId"], *target["txId"]]
+    graph = build_graph(pd.DataFrame({"txId1": ids[:-1], "txId2": ids[1:]}))
+    plain = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True)(train, target, columns, 0, graph)
+    blend = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, stage2_rf_weight=0.5)(train, target, columns, 0, graph)
+
+    assert blend.shape == plain.shape == (len(target),)
+    assert np.all((blend > 0) & (blend <= 1))  # rank average
+    assert np.corrcoef(pd.Series(plain).rank(), blend)[0, 1] > 0.5

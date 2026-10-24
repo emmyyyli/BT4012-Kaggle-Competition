@@ -25,6 +25,18 @@ def _fit(frame, columns, seed, weights=None, params=None):
     return model.fit(frame[columns], frame["label"].to_numpy(), **kwargs)
 
 
+RF_PARAMS = dict(n_estimators=500, max_features="sqrt", min_samples_leaf=5, class_weight="balanced_subsample")
+
+
+def _fit_forest(frame, columns, seed, weights=None):
+    """Random Forest on the same rows and weights (scikit-learn handles NaN natively)."""
+    from sklearn.ensemble import RandomForestClassifier
+
+    model = RandomForestClassifier(random_state=seed, n_jobs=-1, **RF_PARAMS)
+    kwargs = {} if weights is None else {"sample_weight": np.asarray(weights)}
+    return model.fit(frame[columns], frame["label"].to_numpy(), **kwargs)
+
+
 def build_graph(edges):
     """Directed edge table in both orientations, tagged with the direction seen from ``u``."""
     edges = edges[["txId1", "txId2"]].drop_duplicates()
@@ -509,7 +521,7 @@ def covariate_shift_weights(train, target, columns, drop_rounds=3, drop_per_roun
 def make_neighbour_stack(
     half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False, forward_oof=False,
     hub=False, chain=False, centrality=False, shift_weights=False, two_hop_wide=False, two_hop_max=False,
-    stage2_match_features=False, stage2_overrides=None,
+    stage2_match_features=False, stage2_overrides=None, stage2_keep=None, stage2_rf_weight=0.0,
 ):
     """Two-stage stacking over labeled neighbours.
 
@@ -529,6 +541,10 @@ def make_neighbour_stack(
     stage-1 tree (about 106) instead of twice as many from the overlapping graph statistics.
     ``stage2_overrides``: dict of LightGBM settings applied to the final stage only, after
     ``stage2_match_features`` (e.g. ``{"reg_lambda": 8.0}``).
+    ``stage2_keep``: restrict the final stage to these columns (supplied or engineered); stage 1
+    and the graph context are unchanged. Column matching then uses the kept count.
+    ``stage2_rf_weight``: also fit a Random Forest on the same stage-2 features and weights, and
+    return the rank average (1 - w) * rank(LightGBM) + w * rank(RF). 0 = LightGBM only.
     ``propagate``: add 3-hop label-free score propagation (``propagation_features``).
     ``directional``: add two-hop score means split by payment direction
     (``directional_two_hop_features``: forward, backward, co-spent, co-funded).
@@ -551,13 +567,16 @@ def make_neighbour_stack(
     """
     state = {"shift": None}
 
-    def fit(frame, columns, seed, reference_step, params=None):
+    def row_weights(frame, reference_step):
         weights = None if half_life_steps is None else _recency_weights(frame["time_step"], reference_step, half_life_steps)
         if state["shift"] is not None:
             shift = state["shift"].reindex(frame["txId"]).to_numpy()
             weights = shift if weights is None else np.asarray(weights) * shift
             weights = weights / weights.mean()
-        return _fit(frame, columns, seed, weights, params)
+        return weights
+
+    def fit(frame, columns, seed, reference_step, params=None):
+        return _fit(frame, columns, seed, row_weights(frame, reference_step), params)
 
     def out_of_fold(train, target, columns, seed, reference, score_target):
         """Out-of-fold scores for ``train`` (folds = blocks of time steps) + fold models' target scores."""
@@ -623,6 +642,9 @@ def make_neighbour_stack(
             oof, fold_target_scores = out_of_fold(train_x, target_x, stacked_columns, seed, reference, score_target=True)
             scores = pd.concat([pd.Series(oof, index=train["txId"]), pd.Series(np.mean(fold_target_scores, axis=0), index=target["txId"])])
         train_x, target_x, stacked_columns = with_context(train, target, columns, graph_context(train, target, scores, graph))
+        if stage2_keep is not None:
+            keep = set(stage2_keep)
+            stacked_columns = [column for column in stacked_columns if column in keep]
         stage2_params = None
         if stage2_match_features or stage2_overrides:
             stage2_params = dict(TUNED_LGBM_PARAMS)
@@ -630,7 +652,13 @@ def make_neighbour_stack(
                 stage2_params["colsample_bytree"] *= len(columns) / len(stacked_columns)
             stage2_params.update(stage2_overrides or {})
         model = fit(train_x, stacked_columns, seed, reference, stage2_params)
-        return model.predict_proba(target_x[stacked_columns])[:, 1]
+        prediction = model.predict_proba(target_x[stacked_columns])[:, 1]
+        if stage2_rf_weight > 0:
+            forest = _fit_forest(train_x, stacked_columns, seed, row_weights(train_x, reference))
+            forest_prediction = forest.predict_proba(target_x[stacked_columns])[:, 1]
+            prediction = ((1 - stage2_rf_weight) * pd.Series(prediction).rank(pct=True)
+                          + stage2_rf_weight * pd.Series(forest_prediction).rank(pct=True)).to_numpy()
+        return prediction
 
     return fit_predict
 
