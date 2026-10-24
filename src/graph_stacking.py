@@ -37,6 +37,20 @@ def _fit_forest(frame, columns, seed, weights=None):
     return model.fit(frame[columns], frame["label"].to_numpy(), **kwargs)
 
 
+def _fit_ranker(frame, columns, seed, weights, params, target):
+    """LightGBM ranker (rank_xendcg) with one query per time step; percentile ranks of target scores."""
+    from lightgbm import LGBMRanker
+
+    order = np.argsort(frame["time_step"].to_numpy(), kind="stable")
+    ordered = frame.iloc[order]
+    groups = ordered.groupby("time_step", sort=True).size().to_numpy()
+    settings = dict(TUNED_LGBM_PARAMS if params is None else params)
+    ranker = LGBMRanker(objective="rank_xendcg", random_state=seed, n_jobs=-1, verbosity=-1, **settings)
+    kwargs = {} if weights is None else {"sample_weight": np.asarray(weights)[order]}
+    ranker.fit(ordered[columns], ordered["label"].to_numpy(), group=groups, **kwargs)
+    return pd.Series(ranker.predict(target[columns])).rank(pct=True).to_numpy()
+
+
 def build_graph(edges):
     """Directed edge table in both orientations, tagged with the direction seen from ``u``."""
     edges = edges[["txId1", "txId2"]].drop_duplicates()
@@ -522,6 +536,7 @@ def make_neighbour_stack(
     half_life_steps=None, rich=False, wide=False, two_hop=False, propagate=False, extra_rounds=0, directional=False, forward_oof=False,
     hub=False, chain=False, centrality=False, shift_weights=False, two_hop_wide=False, two_hop_max=False,
     stage2_match_features=False, stage2_overrides=None, stage2_keep=None, stage2_rf_weight=0.0,
+    contrast=False, stage2_rank_objective=False,
 ):
     """Two-stage stacking over labeled neighbours.
 
@@ -545,6 +560,10 @@ def make_neighbour_stack(
     and the graph context are unchanged. Column matching then uses the kept count.
     ``stage2_rf_weight``: also fit a Random Forest on the same stage-2 features and weights, and
     return the rank average (1 - w) * rank(LightGBM) + w * rank(RF). 0 = LightGBM only.
+    ``contrast``: add, for each WIDE_NEIGHBOUR_FEATURES column, the transaction's own value minus
+    the mean over its labeled neighbours (requires ``wide``).
+    ``stage2_rank_objective``: fit the final stage as a LightGBM ranker (``rank_xendcg``, one
+    query per time step) instead of a classifier; returns percentile ranks of its scores.
     ``propagate``: add 3-hop label-free score propagation (``propagation_features``).
     ``directional``: add two-hop score means split by payment direction
     (``directional_two_hop_features``: forward, backward, co-spent, co-funded).
@@ -616,6 +635,10 @@ def make_neighbour_stack(
                 neighbour = neighbour.join(chain_features(graph, both["txId"]).set_axis(both["txId"]))
             if centrality:
                 neighbour = neighbour.join(centrality_features(graph, both["txId"]).set_axis(both["txId"]))
+            if contrast:
+                own = both.set_index("txId")[list(WIDE_NEIGHBOUR_FEATURES)].reindex(neighbour.index)
+                means = neighbour[[f"nbrw_mean_{f}" for f in WIDE_NEIGHBOUR_FEATURES]].to_numpy()
+                neighbour = neighbour.join((own - means).add_prefix("contrast_"))
         return neighbour
 
     def with_context(train, target, columns, neighbour):
@@ -651,6 +674,8 @@ def make_neighbour_stack(
             if stage2_match_features:
                 stage2_params["colsample_bytree"] *= len(columns) / len(stacked_columns)
             stage2_params.update(stage2_overrides or {})
+        if stage2_rank_objective:
+            return _fit_ranker(train_x, stacked_columns, seed, row_weights(train_x, reference), stage2_params, target_x)
         model = fit(train_x, stacked_columns, seed, reference, stage2_params)
         prediction = model.predict_proba(target_x[stacked_columns])[:, 1]
         if stage2_rf_weight > 0:

@@ -7,6 +7,8 @@ and is then judged on the Kaggle public leaderboard. Variants:
 ``recent_K``      train only on the last K labeled time steps before the cut-off
 ``halflife_H``    exponential recency weights with half-life H steps (mean-one weights)
 ``temporal_bag``  rank-average of models trained on all steps, the last 25 and the last 15
+``nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14`` / ``_rank_``
+                  round-19: + own-minus-neighbour-mean contrast features; stage-2 ranking objective
 ``nbr_stack_wide_2hopw_chain_shift_s2reg_rf50_hl14`` / ``_rf100_``
                   round-18: final model rank-blended 50/50 with a stage-2 Random Forest; RF alone (diagnostic)
 ``nbr_stack_wide_2hopw_chain_shift_s2reg_prune95_hl14``
@@ -148,21 +150,25 @@ def variants():
     registry["nbr_stack_wide_2hopw_chain_shift_s2reg_prune95_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, stage2_keep=STAGE2_KEEP_95)
     registry["nbr_stack_wide_2hopw_chain_shift_s2reg_rf50_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, stage2_rf_weight=0.5)
     registry["nbr_stack_wide_2hopw_chain_shift_s2reg_rf100_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, stage2_rf_weight=1.0)
+    registry["nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, contrast=True)
+    registry["nbr_stack_wide_2hopw_chain_shift_s2reg_rank_hl14"] = make_neighbour_stack(**final, stage2_match_features=True, stage2_rank_objective=True)
     registry["nbr_stack_rich_2hop_prop_hl14"] = make_neighbour_stack(half_life_steps=14, rich=True, two_hop=True, propagate=True)
     return registry
 
 
-def evaluate(labeled, columns, graph, names=None, prefix="round3"):
+def evaluate(labeled, columns, graph, names=None, prefix="round3", windows=None, seeds=None):
     times = labeled["time_step"].to_numpy()
     registry = variants()
     if names:
         registry = {name: registry[name] for name in ["tuned_lgbm_all", *names]}
     frames = []
     for window_name, window in REPORT_WINDOWS.items():
+        if windows and window_name not in windows:
+            continue
         train_pos, valid_pos = window_positions(times, window)
         train, target = labeled.iloc[train_pos], labeled.iloc[valid_pos]
         for name, fit_predict in registry.items():
-            for seed in EVAL_SEEDS:
+            for seed in (seeds or EVAL_SEEDS):
                 frames.append(pd.DataFrame({
                     "candidate": name, "window": window_name, "seed": seed, "position": valid_pos,
                     "time_step": times[valid_pos], "label": target["label"].to_numpy(),
@@ -204,6 +210,8 @@ def main():
     parser.add_argument("command", choices=["evaluate", "submit", "blend"])
     parser.add_argument("names", nargs="*")
     parser.add_argument("--prefix", default=None, help="output table prefix for evaluate (default round3/round4)")
+    parser.add_argument("--windows", nargs="*", default=None, help="evaluate: only these report windows (e.g. t28_v29-35)")
+    parser.add_argument("--eval-seeds", type=int, default=None, help="evaluate: number of seeds (default 2)")
     parser.add_argument("--seeds", type=int, default=len(SUBMIT_SEEDS), help="submit: number of seeds (0..N-1); files get an _sN suffix unless N=10")
     args = parser.parse_args()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -214,7 +222,8 @@ def main():
     if args.command == "blend":  # blend OUTPUT_NAME NAME1 NAME2 ...
         blend_files(args.names[0], args.names[1:], sample_submission)
     elif args.command == "evaluate":
-        evaluate(labeled, columns, graph, args.names, prefix=args.prefix or ("round4" if args.names else "round3"))
+        evaluate(labeled, columns, graph, args.names, prefix=args.prefix or ("round4" if args.names else "round3"),
+                 windows=args.windows, seeds=None if args.eval_seeds is None else tuple(range(args.eval_seeds)))
     else:
         submit(labeled, test, columns, graph, args.names, sample_submission, seeds=tuple(range(args.seeds)))
 

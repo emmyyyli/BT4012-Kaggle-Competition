@@ -1,0 +1,5 @@
+candidate,t28_v29-35,mean
+nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14,0.9985962849077415,0.9985962849077415
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,0.9985553892711956,0.9985553892711956
+nbr_stack_wide_2hopw_chain_shift_s2reg_rank_hl14,0.9977694377697363,0.9977694377697363
+tuned_lgbm_all,0.9960270441739192,0.9960270441739192

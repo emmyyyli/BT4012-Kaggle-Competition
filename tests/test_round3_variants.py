@@ -396,3 +396,21 @@ def test_stage2_random_forest_blend_returns_rank_scores():
     assert blend.shape == plain.shape == (len(target),)
     assert np.all((blend > 0) & (blend <= 1))  # rank average
     assert np.corrcoef(pd.Series(plain).rank(), blend)[0, 1] > 0.5
+
+
+def test_contrast_features_and_rank_objective_run():
+    from src.graph_stacking import WIDE_NEIGHBOUR_FEATURES, make_neighbour_stack
+
+    columns = list(dict.fromkeys(["feat_1", "feat_2", *WIDE_NEIGHBOUR_FEATURES]))
+    train = _frame(np.repeat(np.arange(1, 11), 30), 0)
+    target = _frame(np.repeat([11, 12], 20), 1)
+    for frame in (train, target):
+        for column in WIDE_NEIGHBOUR_FEATURES:
+            if column not in ("feat_1", "feat_2"):
+                frame[column] = np.arange(len(frame), dtype=float)
+    ids = [*train["txId"], *target["txId"]]
+    graph = build_graph(pd.DataFrame({"txId1": ids[:-1], "txId2": ids[1:]}))
+    for options in ({"contrast": True}, {"stage2_rank_objective": True}):
+        scores = make_neighbour_stack(half_life_steps=14, rich=True, wide=True, two_hop=True, **options)(train, target, columns, 0, graph)
+        assert scores.shape == (len(target),)
+        assert np.all((scores >= 0) & (scores <= 1))

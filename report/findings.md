@@ -1970,3 +1970,26 @@ features as the 0.97190 model; Random Forest is the strongest model in the liter
 
 On the predictive window the RF alone is clearly weaker (−0.0008) and the blend flat (−0.0001), with
 higher seed spread. Not submitted: the predictive window gives no reason to expect a gain.
+
+## 47. Round 19: contrast features and a ranking objective, screened on the predictive window (2026-10-24)
+
+Screening rule (fixed before running, from §46): an idea earns a submission only if its 3-seed mean
+ROC-AUC on ≤28→29–35 beats the 0.97190 model by ≥ +0.0003 (≈ 3–5× that window's seed noise, and the
+size of local gap that matched a real public gap). New harness options `--windows`, `--eval-seeds`.
+
+| Variant (3 seeds, ≤28→29–35) | Mean ROC-AUC | Seed sd | Δ vs 0.97190 model | Verdict |
+|---|---|---|---|---|
+| 0.97190 model | 0.99852 | 0.00008 | — | reference |
+| + contrast features (own − labeled-neighbour mean, 25 features) | 0.99858 | 0.00003 | +0.00006 | tie; not submitted |
+| stage 2 as ranker (`rank_xendcg`, one query per time step) | 0.99766 | 0.00012 | −0.00086 | worse; not submitted |
+
+- **Contrast features** add nothing measurable: stage 2 already sees both the own value and the
+  neighbour mean, and trees can split on either.
+- **The ranking objective loses clearly.** It optimises ordering *within* each time step, but the
+  competition scores AUC pooled across steps, which also depends on how scores compare *between*
+  steps (illicit share varies from 0.4% to 36% by step, §1.4). The classifier's probabilities carry
+  that between-step information; the per-step ranker discards it.
+
+Neither clears the bar, so the last two submissions are left unused. Modelling is closed.
+Final picks: pick 1 `submission_nbr_stack_wide_2hopw_chain_shift_s2reg_hl14.csv` (0.97190), pick 2
+`submission_nbr_stack_wide_2hopw_chain_shift_s2reg_prune95_hl14.csv` (0.97176).

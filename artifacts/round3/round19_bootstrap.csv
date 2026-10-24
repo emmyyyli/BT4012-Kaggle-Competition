@@ -1,0 +1,4 @@
+candidate,window,delta_ci_2_5,delta_ci_97_5,prob_delta_positive
+nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14,t28_v29-35,0.001739680965019383,0.0031570276624716676,1.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_hl14,t28_v29-35,0.001700810550698137,0.0030899140091765476,1.0
+nbr_stack_wide_2hopw_chain_shift_s2reg_rank_hl14,t28_v29-35,0.0007062729059804651,0.0024703892917478333,1.0
