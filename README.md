@@ -27,7 +27,7 @@ python -m pytest                     # unit tests
 ```
 
 The final model is defined in [`src/final_config.py`](src/final_config.py) and implemented
-in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.97196**):
+in [`src/graph_stacking.py`](src/graph_stacking.py) (public ROC-AUC **0.97196**, private **0.96176**):
 
 1. **Stage 1:** a tuned, shallow LightGBM (9 leaves, 500 trees) on the 165 supplied features
    scores labeled training rows out-of-fold (5 folds of consecutive time steps) and test rows
