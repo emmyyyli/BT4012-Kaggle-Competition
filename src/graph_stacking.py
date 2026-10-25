@@ -6,7 +6,7 @@ transaction, aggregates over its *labeled* neighbours (one hop) and over labeled
 away. The only transactions with features in the Kaggle test period (steps 36-49) are labeled
 ones, so restricting context to labeled nodes, and letting walks pass through featureless
 nodes, computes every graph feature the same way at training and prediction time
-(report/findings.md sections 1.3, 11.1, 17.1 and 20.1). No label of a target row is used.
+(docs/findings.md sections 1.3, 11.1, 17.1 and 20.1). No label of a target row is used.
 """
 
 import numpy as np
@@ -498,7 +498,7 @@ def covariate_shift_weights(train, target, columns, drop_rounds=3, drop_per_roun
     labels). With all supplied features the two periods separate perfectly through a few
     time-trend features, which would make every weight ~0 and only repeat the recency weights.
     So ``drop_rounds`` times the ``drop_per_round`` features with the largest adversarial gain
-    are removed first (report/findings.md section 37: AUC 1.000 -> 0.94 after 30 features,
+    are removed first (docs/findings.md section 37: AUC 1.000 -> 0.94 after 30 features,
     weight-vs-step correlation 0.62 -> 0.37). The remaining odds are tempered by ``power``,
     normalised to mean one, clipped to ``clip`` and renormalised. The removed features are
     dropped only for the weights; the fraud classifier keeps all of them.
@@ -576,7 +576,7 @@ def make_neighbour_stack(
     steps (the first block, which has no past, keeps its ordinary out-of-fold scores), and score
     target rows with a model fitted on all training rows. Ordinary out-of-fold models also see
     later steps, so training-row neighbour scores are far more accurate than the forward-only
-    scores target rows get (AUC 0.997 vs 0.985 on steps 8-35, report/findings.md section 32);
+    scores target rows get (AUC 0.997 vs 0.985 on steps 8-35, docs/findings.md section 32);
     this option gives stage 2 neighbour scores of the quality it will meet at prediction time.
     ``hub``: add neighbour means down-weighted by degree (``hub_weighted_features``).
     ``chain``: add label-free payment-chain shape (``chain_features``).

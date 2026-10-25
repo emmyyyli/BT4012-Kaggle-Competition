@@ -48,7 +48,7 @@ and is then judged on the Kaggle public leaderboard. Variants:
                   labeled neighbours (mean, max, incoming mean, outgoing mean) and added as
                   features for stage 2. In the test period only labeled transactions have
                   features, so restricting to labeled neighbours keeps train and test consistent
-                  (report/findings.md section 11.1).
+                  (docs/findings.md section 11.1).
 
 The stacking implementation lives in ``src/graph_stacking.py``.
 

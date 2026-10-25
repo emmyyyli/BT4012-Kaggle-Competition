@@ -41,7 +41,7 @@ REPORT_WINDOWS = {
 # Short-horizon windows (about 7 steps). The first Kaggle scores ranked all-features >
 # all/aggregated blend > aggregated-only. Only the short report windows (t25, t28) ranked
 # the three models the same way; the long windows ranked them in reverse. So tuning and
-# confirmation use short horizons. See report/findings.md section 6.
+# confirmation use short horizons. See docs/findings.md section 6.
 TUNING_WINDOWS = {
     "t14_v15-21": (14, 15, 21),
     "t18_v19-25": (18, 19, 25),

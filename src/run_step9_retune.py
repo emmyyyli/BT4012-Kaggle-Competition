@@ -2,7 +2,7 @@
 
 The settings in ``TUNED_LGBM_PARAMS`` were tuned (step 4) on the mean of three windows, one of which
 (train <= 21 -> validate 22-28) ranks models almost opposite to the public leaderboard
-(report/findings.md section 46). Here the full final stacked model is re-tuned on train <= 28 ->
+(docs/findings.md section 46). Here the full final stacked model is re-tuned on train <= 28 ->
 validate 29-35, the window whose ranking agrees with Kaggle (Spearman +0.81).
 
 Usage:

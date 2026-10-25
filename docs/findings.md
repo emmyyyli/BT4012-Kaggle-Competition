@@ -2088,3 +2088,12 @@ paired SE is about 0.0044 (z ≈ −2.2): a real loss, the largest since the Gra
 
 The 0.97190 model is not picked: it is a near-duplicate of pick 1 (ρ 0.9985). The deliverables
 (`FINAL_STACK` + `contrast: True`, notebook, report) are switched to pick 1.
+
+## 50. Private leaderboard result (2026-10-25)
+
+Final private ROC-AUC (other 70% of test rows): **0.96176**, 0.010 below the public 0.97196.
+Public and private are disjoint random samples (single-score SE ≈ 0.0077 public, 0.0051 private), so
+the difference has SE ≈ 0.009: the gap is about one standard error. Selection adds to it: the best of
+40+ public submissions is flattered on the public rows, and the late refinements (each < 0.002
+public) were below what the public LB could confirm. The large early gains (graph context +0.024,
+recency) far exceed this gap. Recorded in the report's Results and Limitations.

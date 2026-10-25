@@ -14,7 +14,7 @@ Outputs:
   with labeled graph context at one and two hops.
 
 Kaggle scores are not recomputable locally (test labels are hidden); they are transcribed
-from the leaderboard as recorded in report/findings.md.
+from the leaderboard as recorded in docs/findings.md.
 
 Run from the project root: ``python -m src.report_metrics``.
 """

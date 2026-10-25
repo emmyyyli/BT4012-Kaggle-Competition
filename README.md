@@ -7,7 +7,7 @@ splits, never as a model input.
 
 The submission notebook is [`e1304439.ipynb`](e1304439.ipynb). The full experiment record,
 with every result and the reasoning behind each decision, is in
-[`report/findings.md`](report/findings.md).
+[`docs/findings.md`](docs/findings.md).
 
 ## Setup
 
@@ -105,7 +105,7 @@ features. Every graph feature is therefore computed the same way in training and
 | `…_s2reg_contrast_hl14` (+ contrast features, **final model**, private pick 1) | **0.97196** |
 | `…_s2reg_retuned_hl14` (settings re-tuned for more capacity) | 0.96207 |
 
-Full commentary for every round is in `report/findings.md`.
+Full commentary for every round is in `docs/findings.md`.
 
 ## Experiment scripts
 

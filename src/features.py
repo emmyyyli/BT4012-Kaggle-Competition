@@ -10,7 +10,7 @@ IDENTIFIER_COLUMNS = {"index", "txId", "label", "time_step"}
 # followed by 72 one-hop aggregated features. With time_step supplied as its own
 # column, feat_1-feat_93 are the local features and feat_94-feat_165 the aggregates.
 # An attempt to reconstruct the aggregates from neighbour statistics was inconclusive,
-# so this split rests on the dataset documentation (see report/findings.md).
+# so this split rests on the dataset documentation (see docs/findings.md).
 LAST_LOCAL_FEATURE = 93
 
 

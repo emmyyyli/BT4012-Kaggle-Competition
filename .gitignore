@@ -32,3 +32,6 @@ artifacts/stress/stress_predictions.csv
 
 # Intermediate HTML from src/build_report.py
 report/*.html
+
+# Written report: submitted separately, not part of the code repository
+report/

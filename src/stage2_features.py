@@ -1,4 +1,4 @@
-"""Stage-2 feature list for the pruned variant (report/findings.md section 45).
+"""Stage-2 feature list for the pruned variant (docs/findings.md section 45).
 
 The 151 stage-2 features that together carry 95% of mean |TreeSHAP| on test rows of the final
 model (seed 0, fitted on all labeled rows; ``artifacts/report/final_model_feature_importance.csv``).

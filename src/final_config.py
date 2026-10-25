@@ -1,7 +1,7 @@
 """Version-controlled settings for the final submission model.
 
 ``python -m src.train`` and ``e1304439.ipynb`` read this file to reproduce the submission
-without re-running any search. Selection evidence: report/findings.md (sections 14-20, 35, 37-49).
+without re-running any search. Selection evidence: docs/findings.md (sections 14-20, 35, 37-49).
 
 Final model: two-stage graph stacking (``src/graph_stacking.py``) with tuned LightGBM in both
 stages, half-life-14 recency weights, one-hop labeled-neighbour context ("rich": structure
@@ -15,7 +15,7 @@ ROC-AUC 0.97196 with own-minus-neighbour-mean contrast features (``contrast``), 
 Each seed repeats both stages; seed predictions are averaged. Without the stage-2 column
 matching it scored 0.97097; with two-hop means over 5 features only, 0.9702; without
 ``shift_weights`` as well, 0.96858 (the second private pick, ``SECOND_PICK_NAME``);
-report/findings.md sections 35-41.
+docs/findings.md sections 35-41.
 """
 
 from src.model_zoo import SHALLOW_LGBM_PARAMS, TUNED_LGBM_PARAMS
@@ -33,7 +33,7 @@ ALTERNATIVE_STACK = {"half_life_steps": 14, "rich": True, "two_hop": True}
 
 # Steady second private-leaderboard pick (public 0.96858): the final model without the shift
 # weights (``python -m src.run_step8_variants submit nbr_stack_wide_2hop_chain_hl14``);
-# report/findings.md section 39.
+# docs/findings.md section 39.
 SECOND_PICK_NAME = "nbr_stack_wide_2hop_chain_hl14"
 SECOND_PICK_STACK = {"half_life_steps": 14, "rich": True, "wide": True, "two_hop": True, "chain": True}
 

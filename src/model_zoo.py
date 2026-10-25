@@ -37,7 +37,7 @@ SHALLOW_LGBM_PARAMS = dict(
     reg_lambda=5.0,
 )
 
-# Tuned LightGBM settings (Optuna, short-horizon tuning windows; report/findings.md section 8).
+# Tuned LightGBM settings (Optuna, short-horizon tuning windows; docs/findings.md section 8).
 TUNED_LGBM_PARAMS = dict(
     n_estimators=500,
     learning_rate=0.0252683175248254,
@@ -49,7 +49,7 @@ TUNED_LGBM_PARAMS = dict(
     reg_lambda=2.035593509388961,
 )
 
-# Re-tuned on the window that tracks Kaggle (train <= 28 -> validate 29-35; report/findings.md
+# Re-tuned on the window that tracks Kaggle (train <= 28 -> validate 29-35; docs/findings.md
 # section 48): median / geometric median of the top 5 of 20 Optuna trials of the full final stack.
 RETUNED_LGBM_PARAMS = dict(
     n_estimators=878,

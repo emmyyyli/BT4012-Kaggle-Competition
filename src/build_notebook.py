@@ -31,7 +31,7 @@ CELLS = [
 This notebook reproduces the final Kaggle submission end to end: data checks, feature
 preparation, time-forward validation, final training and the submission file. The
 experiments that led to these choices are run by the scripts in `src/` and recorded in
-`report/findings.md`; their saved result tables are summarised at the end.
+`docs/findings.md`; their saved result tables are summarised at the end.
 
 **Approach in brief**
 * Supervised training uses only transactions with a confirmed label (`0` licit / `1` illicit).
@@ -117,7 +117,7 @@ pd.Series(audit)
 Two-thirds of a test transaction's neighbours have no features, while every training
 transaction's neighbours do. A graph neural network that reads all neighbour features
 therefore meets a different input distribution at test time (GraphSAGE lowered the Kaggle
-score; `report/findings.md` sections 1.3 and 7). The final model avoids this by using only
+score; `docs/findings.md` sections 1.3 and 7). The final model avoids this by using only
 *labeled* neighbours, which have features in both periods, and by letting two-hop walks pass
 through featureless nodes. Coverage of that context is similar in training and test:
 """),
@@ -204,7 +204,7 @@ graph context (Kaggle 0.94417). The short windows (train <= 25 or <= 28) are the
 model ranking matched the Kaggle leaderboard; the graph stack wins there but loses on the long
 windows, and the Kaggle leaderboard (+0.0225 over the reference) sided with the short windows.
 Local windows cannot reproduce the test period's drift, so they serve here as a reproducibility
-check rather than as the selection criterion (`report/findings.md` sections 11, 14, 20).
+check rather than as the selection criterion (`docs/findings.md` sections 11, 14, 20).
 Runtime: several minutes.
 """),
     code("""
@@ -233,7 +233,7 @@ submission.describe().T
 ## 6. Experiment record
 
 Summary tables saved by the experiment scripts (if present locally). Full commentary, including
-the Kaggle scores of each submitted variant, is in `report/findings.md`.
+the Kaggle scores of each submitted variant, is in `docs/findings.md`.
 """),
     code("""
 for label, relative in [
