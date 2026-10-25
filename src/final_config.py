@@ -1,7 +1,14 @@
-"""Version-controlled settings for the final submission model.
+"""Version-controlled settings for the two submissions selected for the private leaderboard.
 
-``python -m src.train`` and ``e1304439.ipynb`` read this file to reproduce the submission
-without re-running any search. Selection evidence: docs/findings.md (sections 14-20, 35, 37-49).
+``python -m src.train`` and ``e1304439.ipynb`` read this file to regenerate both selected
+submissions without re-running any search:
+
+* pick 1 (``FINAL_NAME`` / ``FINAL_STACK``): public 0.97196, private 0.96176 ->
+  ``submissions/submission_final.csv``
+* pick 2 (``SECOND_PICK_NAME`` / ``SECOND_PICK_STACK``): public 0.97176 ->
+  ``submissions/submission_final_pick2.csv``
+
+ Selection evidence: docs/findings.md (sections 14-20, 35, 37-49).
 
 Final model: two-stage graph stacking (``src/graph_stacking.py``) with tuned LightGBM in both
 stages, half-life-14 recency weights, one-hop labeled-neighbour context ("rich": structure
@@ -14,11 +21,11 @@ supplied features (``stage2_match_features``), about 106 per tree, as in stage 1
 ROC-AUC 0.97196 with own-minus-neighbour-mean contrast features (``contrast``), 0.97190 without.
 Each seed repeats both stages; seed predictions are averaged. Without the stage-2 column
 matching it scored 0.97097; with two-hop means over 5 features only, 0.9702; without
-``shift_weights`` as well, 0.96858 (the second private pick, ``SECOND_PICK_NAME``);
-docs/findings.md sections 35-41.
+``shift_weights`` as well, 0.96858; docs/findings.md sections 35-50.
 """
 
 from src.model_zoo import SHALLOW_LGBM_PARAMS, TUNED_LGBM_PARAMS
+from src.stage2_features import STAGE2_KEEP_95
 
 FINAL_NAME = "nbr_stack_wide_2hopw_chain_shift_s2reg_contrast_hl14"
 FINAL_SEEDS = tuple(range(10))
@@ -31,12 +38,15 @@ FINAL_STACK = {"half_life_steps": 14, "rich": True, "wide": True, "two_hop": Tru
 ALTERNATIVE_NAME = "nbr_stack_rich_2hop_hl14"
 ALTERNATIVE_STACK = {"half_life_steps": 14, "rich": True, "two_hop": True}
 
-# Steady second private-leaderboard pick (public 0.96858): the final model without the shift
-# weights (``python -m src.run_step8_variants submit nbr_stack_wide_2hop_chain_hl14``);
-# docs/findings.md section 39.
-SECOND_PICK_NAME = "nbr_stack_wide_2hop_chain_hl14"
-SECOND_PICK_STACK = {"half_life_steps": 14, "rich": True, "wide": True, "two_hop": True, "chain": True}
+# Second private-leaderboard pick (public 0.97176): the final model without contrast features and
+# with stage 2 restricted to the 151 features carrying 95% of its influence
+# (``src/stage2_features.py``); steadier across seeds. docs/findings.md sections 45 and 49.
+SECOND_PICK_NAME = "nbr_stack_wide_2hopw_chain_shift_s2reg_prune95_hl14"
+SECOND_PICK_STACK = {**{k: v for k, v in FINAL_STACK.items() if k != "contrast"}, "stage2_keep": STAGE2_KEEP_95}
 
+# Earlier candidates for the second pick, superseded: the chain model (public 0.96858,
+# ``nbr_stack_wide_2hop_chain_hl14``) and a rank blend (public 0.96686) of these files
+# (``python -m src.run_step8_variants blend blend_top4 ...``).
 # Earlier steady pick (public 0.96686, superseded in section 39): equal-weight rank average of
 # these submission files (``python -m src.run_step8_variants blend blend_top4 ...``).
 SECOND_PICK_BLEND = ["nbr_stack_wide_2hop_hl14", "nbr_stack_rich_2hop_hl14", "nbr_stack_wide_hl14", "nbr_stack_rich_hl14"]

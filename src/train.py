@@ -4,12 +4,14 @@
 2. Build the directed transaction graph from the edge list (``src.graph_stacking``).
 3. Validate with the temporal harness (``src.evaluation``): five forward windows, several seeds,
    seed-bagged ROC-AUC, alongside the non-graph tuned LightGBM reference.
-4. Run the final graph-stacking model (``src.final_config``) on all labeled rows (steps 1-35)
-   for every seed in ``FINAL_SEEDS`` and average the test predictions.
-5. Write ``submissions/submission_final.csv`` in the sample-submission order.
+4. Run both selected graph-stacking models (``src.final_config``) on all labeled rows
+   (steps 1-35) for every seed in ``FINAL_SEEDS`` and average the test predictions.
+5. Write ``submissions/submission_final.csv`` (pick 1, public 0.97196) and
+   ``submissions/submission_final_pick2.csv`` (pick 2, public 0.97176) in the
+   sample-submission order.
 
-Run from the project root: ``python -m src.train`` (``--validation-seeds`` with no values
-skips step 3).
+Run from the project root: ``python -m src.train``. ``--validation-seeds`` with no values skips
+step 3; ``--picks 1`` or ``--picks 2`` regenerates only one submission.
 """
 
 import argparse
@@ -34,7 +36,7 @@ from src.evaluation import (
     window_table,
 )
 from src.features import get_feature_groups
-from src.final_config import FINAL_NAME, FINAL_SEEDS, FINAL_STACK, REFERENCE_MEMBERS
+from src.final_config import FINAL_NAME, FINAL_SEEDS, FINAL_STACK, REFERENCE_MEMBERS, SECOND_PICK_NAME, SECOND_PICK_STACK
 from src.graph_stacking import build_graph, make_neighbour_stack
 from src.model_zoo import catboost_factory, lgbm_factory, xgb_factory
 from src.submission import write_submission
@@ -101,7 +103,13 @@ def validate(labeled, graph, seeds, output_dir):
     return evaluate_predictions(predictions, candidates[0].name, output_dir, "final_validation", bootstrap_iterations=200)
 
 
-def run_pipeline(data_dir=DATA_DIR, output_dir=None, validation_seeds=(0, 1, 2), seeds=FINAL_SEEDS):
+PICKS = {
+    1: (FINAL_NAME, FINAL_STACK, "submission_final.csv"),
+    2: (SECOND_PICK_NAME, SECOND_PICK_STACK, "submission_final_pick2.csv"),
+}
+
+
+def run_pipeline(data_dir=DATA_DIR, output_dir=None, validation_seeds=(0, 1, 2), seeds=FINAL_SEEDS, picks=(1, 2)):
     output_dir = PROJECT_ROOT if output_dir is None else Path(output_dir)
     train, test, edges, sample_submission = load_data(data_dir)
     labeled = labeled_frame(train)
@@ -111,29 +119,35 @@ def run_pipeline(data_dir=DATA_DIR, output_dir=None, validation_seeds=(0, 1, 2),
     if validation_seeds:
         tables = validate(labeled, graph, tuple(validation_seeds), output_dir / "artifacts" / "final")
 
-    target = stack_predict(labeled, test, graph, seeds)
-    submission = pd.DataFrame({"index": test["index"].to_numpy(), "target": target})
-    submission_path = write_submission(
-        submission, output_dir / "submissions" / "submission_final.csv", sample_submission=sample_submission
-    )
+    written, configs = {}, {}
+    for pick in picks:
+        name, stack, filename = PICKS[pick]
+        target = stack_predict(labeled, test, graph, seeds, stack=stack)
+        submission = pd.DataFrame({"index": test["index"].to_numpy(), "target": target})
+        written[pick] = write_submission(submission, output_dir / "submissions" / filename, sample_submission=sample_submission)
+        configs[f"pick{pick}"] = {"name": name, "stack": {k: v for k, v in stack.items() if k != "stage2_keep"},
+                                  "stage2_keep": stack.get("stage2_keep"), "submission": filename}
     config_path = output_dir / "models" / "final_model_config.json"
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(json.dumps({"name": FINAL_NAME, "stack": FINAL_STACK, "seeds": list(seeds)}, indent=2))
-    return tables, submission, submission_path, config_path
+    config_path.write_text(json.dumps({**configs, "seeds": list(seeds)}, indent=2))
+    return tables, written, config_path
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--validation-seeds", type=int, nargs="*", default=[0, 1, 2])
+    parser.add_argument("--picks", type=int, nargs="+", choices=[1, 2], default=[1, 2],
+                        help="which selected submissions to regenerate (default: both)")
     args = parser.parse_args()
-    tables, submission, submission_path, config_path = run_pipeline(validation_seeds=tuple(args.validation_seeds))
+    tables, written, config_path = run_pipeline(validation_seeds=tuple(args.validation_seeds), picks=tuple(args.picks))
     if tables is not None:
         print("=== Seed-bagged ROC-AUC by forward window ===")
         print(window_table(tables["window_metrics"]).round(4).to_string())
         print("\n=== Summary vs non-graph tuned LightGBM ===")
         print(tables["summary"].round(4).to_string(index=False))
-    print(f"\nFinal model: {FINAL_NAME}; configuration {config_path}")
-    print(f"Saved submission: {submission_path} ({len(submission)} rows)")
+    print(f"\nConfiguration: {config_path}")
+    for pick, path in written.items():
+        print(f"Pick {pick} ({PICKS[pick][0]}): {path}")
 
 
 if __name__ == "__main__":

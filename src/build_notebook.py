@@ -230,6 +230,21 @@ print(path.relative_to(PROJECT_ROOT), submission.shape)
 submission.describe().T
 """),
     md("""
+### Second selected submission (pick 2)
+
+The second submission selected for the private leaderboard is the same pipeline without the
+contrast features, with stage 2 restricted to the 151 features that carry 95% of the model's
+influence (`src/stage2_features.py`; public ROC-AUC 0.97176). It is regenerated the same way.
+"""),
+    code("""
+from src.final_config import SECOND_PICK_NAME, SECOND_PICK_STACK
+target2 = final_pipeline.stack_predict(labeled, test, graph, FINAL_SEEDS, stack=SECOND_PICK_STACK)
+submission2 = pd.DataFrame({"index": test["index"].to_numpy(), "target": target2})
+path2 = final_pipeline.write_submission(submission2, PROJECT_ROOT / "submissions" / "submission_final_pick2.csv",
+                                        sample_submission=sample_submission)
+print(SECOND_PICK_NAME, "->", path2.relative_to(PROJECT_ROOT), submission2.shape)
+"""),
+    md("""
 ## 6. Experiment record
 
 Summary tables saved by the experiment scripts (if present locally). Full commentary, including
